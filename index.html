@@ -1,0 +1,2383 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Crystal Lab — 재료공학 시각화</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0c0e14; --surface: #14171f; --surface2: #1a1e28;
+  --border: #252a36; --text: #e2e4ea; --text-dim: #8b90a0;
+  --accent-bcc: #f59e42; --accent-fcc: #5ba4f5; --accent-hcp: #6dd4a0; --accent-dc: #a855f7;
+  --accent-edge: #f06070; --accent-screw: #b07af5; --accent-slip: #f5d042;
+  --accent-select: #ff4466;
+  --radius: 10px;
+  --font: 'IBM Plex Sans KR', -apple-system, sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f0f1f5; --surface: #fff; --surface2: #f7f8fa;
+    --border: #dde0e8; --text: #1a1c24; --text-dim: #6b7084;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0c0e14; --surface: #14171f; --surface2: #1a1e28;
+  --border: #252a36; --text: #e2e4ea; --text-dim: #8b90a0;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0)}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;padding-top:env(safe-area-inset-top,0);padding-bottom:env(safe-area-inset-bottom,0)}
+.header{padding:20px 24px 0;max-width:1440px;margin:0 auto}
+.header h1{font-size:1.6rem;font-weight:600;letter-spacing:-0.02em;background:linear-gradient(135deg,var(--accent-fcc),var(--accent-hcp));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.header p{color:var(--text-dim);font-size:0.85rem;margin-top:4px;font-weight:300}
+.main-tabs{display:flex;gap:4px;padding:16px 24px 0;max-width:1440px;margin:0 auto;overflow-x:auto}
+.main-tab{padding:10px 20px;border:none;background:transparent;color:var(--text-dim);font-family:var(--font);font-size:0.85rem;font-weight:500;cursor:pointer;border-radius:var(--radius) var(--radius) 0 0;transition:all 0.2s;white-space:nowrap}
+.main-tab:hover{color:var(--text);background:var(--surface)}
+.main-tab.active{color:var(--text);background:var(--surface)}
+.main-tab.active[data-tab="crystal"]{border-top:2px solid var(--accent-fcc)}
+.main-tab.active[data-tab="dislocation"]{border-top:2px solid var(--accent-edge)}
+.main-tab.active[data-tab="slip"]{border-top:2px solid var(--accent-slip)}
+.content{max-width:1440px;margin:0 auto;padding:0 24px 24px}
+.tab-panel{display:none;background:var(--surface);border-radius:0 var(--radius) var(--radius) var(--radius);overflow:hidden}
+.tab-panel.active{display:block}
+.split-layout{display:grid;grid-template-columns:1fr 380px;min-height:560px}
+@media(max-width:900px){.split-layout{grid-template-columns:1fr}}
+.canvas-wrap{position:relative;background:var(--bg);min-height:450px;cursor:grab;overflow:hidden}
+.canvas-wrap:active{cursor:grabbing}
+.canvas-wrap>canvas{position:absolute;inset:0;width:100%!important;height:100%!important;display:block}
+.canvas-hint{position:absolute;bottom:12px;left:12px;font-size:0.7rem;color:var(--text-dim);opacity:0.6;pointer-events:none}
+.info-panel{padding:24px;border-left:1px solid var(--border);overflow-y:auto;max-height:620px}
+@media(max-width:900px){.info-panel{border-left:none;border-top:1px solid var(--border);max-height:none}}
+.info-panel h3{font-size:1.05rem;font-weight:600;margin-bottom:14px}
+.sub-tabs{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
+.sub-tab{padding:6px 14px;border:1px solid var(--border);background:transparent;color:var(--text-dim);font-family:var(--font);font-size:0.78rem;font-weight:500;cursor:pointer;border-radius:20px;transition:all 0.2s}
+.sub-tab:hover{border-color:var(--text-dim);color:var(--text)}
+.sub-tab.active-bcc{background:var(--accent-bcc);color:#000;border-color:var(--accent-bcc)}
+.sub-tab.active-fcc{background:var(--accent-fcc);color:#000;border-color:var(--accent-fcc)}
+.sub-tab.active-hcp{background:var(--accent-hcp);color:#000;border-color:var(--accent-hcp)}
+.sub-tab.active-dc{background:var(--accent-dc);color:#fff;border-color:var(--accent-dc)}
+.sub-tab.active-edge{background:var(--accent-edge);color:#000;border-color:var(--accent-edge)}
+.sub-tab.active-screw{background:var(--accent-screw);color:#fff;border-color:var(--accent-screw)}
+.prop-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:0.8rem}
+.prop-row:last-child{border-bottom:none}
+.prop-label{color:var(--text-dim)}.prop-value{font-family:var(--mono);font-weight:500;font-size:0.78rem;text-align:right}
+.desc-block{margin-top:14px;padding:14px;background:var(--surface2);border-radius:8px;font-size:0.8rem;line-height:1.6;color:var(--text-dim)}
+.desc-block strong{color:var(--text);font-weight:500}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;font-size:0.8rem}
+.toggle{width:38px;height:20px;border-radius:10px;background:var(--border);border:none;cursor:pointer;position:relative;transition:background 0.2s;flex-shrink:0}
+.toggle.on{background:var(--accent-fcc)}
+.toggle::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform 0.2s}
+.toggle.on::after{transform:translateX(18px)}
+.examples-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(56px,1fr));gap:6px;margin-top:10px}
+.example-chip{padding:5px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-family:var(--mono);font-size:0.7rem;text-align:center;color:var(--text-dim)}
+
+/* View presets */
+.view-presets{display:flex;gap:4px;flex-wrap:wrap;margin-top:10px}
+.view-btn{padding:4px 10px;border:1px solid var(--border);background:transparent;color:var(--text-dim);font-family:var(--font);font-size:0.68rem;font-weight:500;cursor:pointer;border-radius:5px;transition:all 0.15s}
+.view-btn:hover{border-color:var(--text-dim);color:var(--text)}
+.view-btn.active-view{background:var(--accent-fcc);color:#000;border-color:var(--accent-fcc)}
+
+/* Mode selector */
+.mode-selector{margin-top:18px;border-top:1px solid var(--border);padding-top:16px}
+.mode-selector h4{font-size:0.9rem;font-weight:500;margin-bottom:10px}
+.mode-btns{display:flex;gap:6px;margin-bottom:12px}
+.mode-btn{flex:1;padding:8px 10px;border:1px solid var(--border);background:transparent;color:var(--text-dim);font-family:var(--font);font-size:0.76rem;font-weight:500;border-radius:8px;cursor:pointer;transition:all 0.2s;text-align:center}
+.mode-btn:hover{border-color:var(--text-dim);color:var(--text)}
+.mode-btn.active{background:var(--accent-select);color:#fff;border-color:var(--accent-select)}
+.selected-pts{min-height:40px;padding:10px 12px;background:var(--bg);border-radius:8px;font-family:var(--mono);font-size:0.75rem;line-height:1.7;color:var(--text-dim);margin-bottom:10px}
+.selected-pts .pt{display:inline-flex;align-items:center;gap:4px;background:var(--surface2);padding:2px 8px;border-radius:4px;margin:2px 3px}
+.selected-pts .pt .dot{width:8px;height:8px;border-radius:50%}
+.result-box{padding:14px;background:var(--surface2);border-radius:8px;text-align:center;margin-top:10px;min-height:50px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.result-miller{font-family:var(--mono);font-size:1.4rem;font-weight:600;margin-bottom:4px}
+.result-label{font-size:0.75rem;color:var(--text-dim)}
+.btn-clear{padding:6px 16px;border:1px solid var(--border);background:transparent;color:var(--text-dim);font-family:var(--font);font-size:0.75rem;border-radius:6px;cursor:pointer;margin-top:8px;transition:all 0.2s}
+.btn-clear:hover{background:var(--surface2);color:var(--text)}
+.compare-table{width:100%;border-collapse:collapse;font-size:0.78rem;margin-top:16px}
+.compare-table th,.compare-table td{padding:10px 12px;text-align:center;border-bottom:1px solid var(--border)}
+.compare-table th{font-weight:500;color:var(--text-dim);font-size:0.72rem}
+.compare-table td{font-family:var(--mono);font-size:0.78rem}
+.col-bcc{color:var(--accent-bcc)}.col-fcc{color:var(--accent-fcc)}.col-hcp{color:var(--accent-hcp)}.col-dc{color:var(--accent-dc)}
+.slip-card{background:var(--surface2);border-radius:8px;padding:14px;margin-bottom:10px}
+.slip-card h4{font-size:0.88rem;font-weight:500;margin-bottom:6px}
+.slip-formula{font-family:var(--mono);font-size:0.83rem;padding:6px 12px;background:var(--bg);border-radius:6px;margin:6px 4px 6px 0;display:inline-block}
+.schmid-input{display:flex;gap:8px;align-items:center;margin:10px 0}
+.schmid-input label{font-size:0.78rem;color:var(--text-dim);min-width:16px}
+.schmid-input input{width:58px;padding:5px 6px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:0.8rem;text-align:center}
+.schmid-result{font-family:var(--mono);font-size:1.15rem;font-weight:600;text-align:center;padding:12px;background:var(--surface2);border-radius:8px;margin-top:10px}
+.anim-controls{display:flex;gap:8px;margin-top:14px}
+.anim-btn{flex:1;padding:8px 12px;border:1px solid var(--border);background:transparent;color:var(--text);font-family:var(--font);font-size:0.76rem;border-radius:6px;cursor:pointer;transition:all 0.2s}
+.anim-btn:hover{background:var(--surface2)}
+.anim-btn.playing{background:var(--accent-edge);color:#000;border-color:var(--accent-edge)}
+.speed-control{margin-top:10px}
+.speed-control label{font-size:0.73rem;color:var(--text-dim);display:block;margin-bottom:3px}
+.speed-control input[type="range"]{width:100%;accent-color:var(--accent-fcc)}
+.click-overlay{position:absolute;top:10px;left:10px;right:10px;display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none;z-index:10}
+.click-badge{padding:6px 12px;background:rgba(255,68,102,0.85);color:#fff;font-size:0.72rem;font-weight:500;border-radius:6px;pointer-events:none;backdrop-filter:blur(4px)}
+.coord-tooltip{position:absolute;padding:4px 8px;background:rgba(0,0,0,0.8);color:#fff;font-family:var(--mono);font-size:0.68rem;border-radius:4px;pointer-events:none;z-index:20;display:none;white-space:nowrap}
+.main-tab.active[data-tab="stacking"]{border-top:2px solid var(--accent-hcp)}
+.layer-controls{display:flex;gap:6px;margin:12px 0}
+.layer-btn{width:40px;height:40px;border:1px solid var(--border);background:transparent;color:var(--text);font-family:var(--font);font-size:1.1rem;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s}
+.layer-btn:hover{background:var(--surface2)}
+.layer-btn:disabled{opacity:0.3;cursor:default}
+.layer-counter{flex:1;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:0.9rem;font-weight:500}
+.stacking-seq{display:flex;gap:4px;flex-wrap:wrap;margin:10px 0}
+.seq-chip{width:32px;height:32px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:0.8rem;font-weight:600;transition:all 0.2s}
+.seq-chip.active-layer{outline:2px solid var(--text);outline-offset:2px}
+.seq-chip.a-layer{background:#5ba4f5;color:#fff}
+.seq-chip.b-layer{background:#f59e42;color:#fff}
+.seq-chip.c-layer{background:#e05080;color:#fff}
+.seq-chip.dim{opacity:0.3}
+.pip-wrap{position:absolute;top:12px;right:12px;width:180px;height:180px;border-radius:10px;overflow:hidden;border:1px solid var(--border);background:var(--bg);z-index:5;box-shadow:0 4px 20px rgba(0,0,0,0.4);cursor:grab}
+.pip-wrap:active{cursor:grabbing}
+.pip-wrap canvas{width:100%!important;height:100%!important;display:block}
+.pip-label{position:absolute;bottom:4px;left:0;right:0;text-align:center;font-size:0.6rem;color:var(--text-dim);pointer-events:none;opacity:0.7}
+.miller-input-section{margin-top:18px;border-top:1px solid var(--border);padding-top:16px}
+.miller-input-section h4{font-size:0.9rem;font-weight:500;margin-bottom:10px}
+.miller-row{display:flex;gap:6px;align-items:center;margin-bottom:8px}
+.miller-idx{width:42px;padding:6px 4px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:0.85rem;text-align:center}
+.miller-idx:focus{border-color:var(--accent-fcc);outline:none}
+.miller-bracket{font-family:var(--mono);font-size:1.1rem;color:var(--text-dim);font-weight:300}
+.miller-show-btn{padding:7px 16px;border:1px solid var(--accent-fcc);background:var(--accent-fcc);color:#000;font-family:var(--font);font-size:0.76rem;font-weight:500;border-radius:6px;cursor:pointer;transition:all 0.15s}
+.miller-show-btn:hover{opacity:0.85}
+.miller-clear-btn{padding:7px 12px;border:1px solid var(--border);background:transparent;color:var(--text-dim);font-family:var(--font);font-size:0.76rem;border-radius:6px;cursor:pointer;transition:all 0.15s}
+.miller-clear-btn:hover{background:var(--surface2);color:var(--text)}
+.miller-type-btns{display:flex;gap:4px;margin-bottom:10px}
+.miller-type-btn{flex:1;padding:6px 8px;border:1px solid var(--border);background:transparent;color:var(--text-dim);font-family:var(--font);font-size:0.74rem;font-weight:500;border-radius:6px;cursor:pointer;text-align:center;transition:all 0.15s}
+.miller-type-btn.active{background:var(--accent-fcc);color:#000;border-color:var(--accent-fcc)}
+.miller-type-btn.active.type-plane{background:var(--accent-hcp);border-color:var(--accent-hcp)}
+.oct-info .oct-ratio{font-family:var(--mono);font-size:1.25rem;font-weight:600;color:var(--text)}
+.oct-info .oct-bar{height:8px;border-radius:4px;background:var(--border);margin:6px 0 10px;overflow:hidden}
+.oct-info .oct-bar span{display:block;height:100%;border-radius:4px}
+.oct-pip{width:260px;height:290px}
+.oct-pip-title{position:absolute;top:8px;left:0;right:0;text-align:center;font-size:0.74rem;font-weight:600;pointer-events:none;z-index:1}
+.oct-pip-title .sub{display:block;font-size:0.62rem;font-weight:400;color:var(--text-dim);margin-top:2px}
+/* ===== Fe-C 상태도 ===== */
+.main-tab.active[data-tab="fec"]{border-top:2px solid var(--accent-edge)}
+.fec-layout{grid-template-columns:1fr 400px}
+@media(max-width:900px){.fec-layout{grid-template-columns:1fr}}
+.fec-diagram-wrap{background:var(--bg);padding:14px 16px 12px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.fec-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:0.76rem;color:var(--text-dim)}
+.fec-toolbar .view-presets{margin-top:0}
+.fec-svg-box{position:relative}
+.fec-svg-box svg{width:100%;height:auto;max-height:780px;display:block;user-select:none}
+.fec-tip{position:absolute;display:none;pointer-events:none;padding:6px 10px;background:rgba(0,0,0,0.82);color:#fff;font-family:var(--mono);font-size:0.7rem;line-height:1.5;border-radius:6px;z-index:5;white-space:nowrap}
+.fec-plotbg{fill:var(--surface2)}
+.fec-region{fill-opacity:0.3;transition:fill-opacity 0.12s}
+.fec-region.two{fill-opacity:0.22}
+.fec-region[data-id="L"]{fill-opacity:0.18}
+.fec-region.hover{fill-opacity:0.5}
+.fec-region.selected{fill-opacity:0.55;stroke:var(--text);stroke-width:1.5}
+.fec-line{fill:none;stroke:var(--text);stroke-width:1.7;stroke-linejoin:round;opacity:0.85;pointer-events:none}
+.fec-line.dashed{stroke-dasharray:6 4}
+.fec-line.inv{stroke-width:2.2}
+.fec-guide{stroke:var(--text-dim);stroke-width:0.8;stroke-dasharray:3 4;opacity:0.55;pointer-events:none}
+.fec-guide-r{fill:var(--text-dim);font-size:9.5px;pointer-events:none}
+.fec-guide-r .n{fill:var(--text);font-family:var(--mono);font-weight:500}
+.fec-guide-t{fill:var(--text-dim);font-family:var(--mono);font-size:9.5px;pointer-events:none}
+.fec-lab{fill:var(--text);font-family:var(--font);font-size:15px;font-weight:600;pointer-events:none}
+.fec-lab.big{font-size:22px}
+.fec-lab.sm{font-size:12px}
+.fec-lab.dim{fill:var(--text-dim);font-size:11px;font-weight:400;font-style:italic}
+.fec-lab-s{fill:var(--text-dim);font-size:10.5px;font-weight:400;pointer-events:none}
+.fec-lab-bg{fill:var(--bg);opacity:0.75;pointer-events:none}
+.fec-lead{stroke:var(--text-dim);stroke-width:1;pointer-events:none}
+.fec-lead-dot{fill:var(--text-dim);pointer-events:none}
+.fec-inv{fill:var(--accent-select);stroke:#fff;stroke-width:1.5;pointer-events:none}
+.fec-inv-t{fill:var(--text);font-size:11.5px;font-weight:600;pointer-events:none;paint-order:stroke;stroke:var(--bg);stroke-width:3px}
+.fec-inv-d{fill:var(--text-dim);font-family:var(--mono);font-weight:400;font-size:10px}
+.fec-pt{fill:var(--text);pointer-events:none}
+.fec-frame{fill:none;stroke:var(--border);stroke-width:1.2}
+.fec-tick{stroke:var(--text-dim);stroke-width:1}
+.fec-tick-t{fill:var(--text-dim);font-family:var(--mono);font-size:10.5px}
+.fec-axis-t{fill:var(--text);font-size:12px;font-weight:500}
+.fec-cross{stroke:var(--text);stroke-width:0.7;stroke-dasharray:2 3;opacity:0.6;pointer-events:none}
+.fec-tie{stroke:var(--text);stroke-width:2.2;pointer-events:none}
+.fec-tie-end{stroke:var(--bg);stroke-width:1.5;pointer-events:none}
+.fec-sel{fill:var(--accent-select);stroke:#fff;stroke-width:2;pointer-events:none}
+.fec-legend{display:flex;flex-wrap:wrap;gap:10px;font-size:0.72rem;color:var(--text-dim)}
+.fec-legend span{display:inline-flex;align-items:center;gap:5px}
+.fec-legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
+.fec-info{max-height:820px}
+.fec-head-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.fec-chip{padding:3px 10px;border-radius:12px;color:#000;font-weight:600;font-size:0.8rem}
+.fec-plus{color:var(--text-dim);font-size:0.8rem}
+.fec-coord{margin-left:auto;font-family:var(--mono);font-size:0.72rem;color:var(--text-dim)}
+.fec-section{margin-top:16px;border-top:1px solid var(--border);padding-top:14px}
+.fec-section h4{font-size:0.9rem;font-weight:500;margin-bottom:10px}
+.fec-3d{position:relative;height:260px;background:var(--bg);border-radius:8px;overflow:hidden;cursor:grab}
+.fec-3d:active{cursor:grabbing}
+.fec-3d canvas{position:absolute;inset:0;width:100%!important;height:100%!important;display:block}
+.fec-3d-legend{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0 4px;font-size:0.72rem;color:var(--text-dim)}
+.fec-3d-legend span{display:inline-flex;align-items:center;gap:5px}
+.fec-3d-legend i{width:11px;height:11px;border-radius:50%;display:inline-block}
+.fec-note{font-size:0.72rem;color:var(--text-dim);line-height:1.55;margin:6px 0}
+.fec-card{background:var(--surface2);border-radius:8px;padding:12px 14px;margin-top:10px;border-left:3px solid}
+.fec-card-h{font-weight:600;font-size:0.88rem;margin-bottom:4px}
+.fec-pv{font-family:var(--font);font-size:0.76rem;max-width:62%}
+.fec-table{width:100%;border-collapse:collapse;font-size:0.76rem}
+.fec-table th,.fec-table td{padding:7px 6px;border-bottom:1px solid var(--border);text-align:center}
+.fec-table th{font-weight:500;color:var(--text-dim);font-size:0.72rem}
+.fec-table td:first-child{text-align:left;color:var(--text-dim)}
+.fec-table td{font-family:var(--mono)}
+.fec-table .hl{background:rgba(255,68,102,0.12);color:var(--text);font-weight:600}
+.fec-lever{margin-top:14px;background:var(--surface2);border-radius:8px;padding:14px}
+.fec-lever h4{font-size:0.9rem;font-weight:500;margin-bottom:10px}
+.lever-line{position:relative;display:flex;height:10px;border-radius:5px;overflow:visible}
+.lever-line span{display:block;height:100%}
+.lever-l{border-radius:5px 0 0 5px}.lever-r{border-radius:0 5px 5px 0}
+.lever-c0{position:absolute;top:-5px;width:4px;height:20px;margin-left:-2px;background:var(--text);border-radius:2px}
+.lever-ends{display:flex;justify-content:space-between;font-family:var(--mono);font-size:0.7rem;margin-top:6px;color:var(--text-dim)}
+.lever-eq{font-family:var(--mono);font-size:0.74rem;line-height:1.6;margin-top:10px;padding:8px 10px;background:var(--bg);border-radius:6px}
+.lever-note{font-size:0.74rem;color:var(--text-dim);line-height:1.55;margin-top:10px}
+.fec-octsvg{width:100%;height:auto;display:block;margin:6px 0}
+.fec-octsvg text{font-family:var(--mono);font-size:10px;fill:var(--text-dim)}
+.fec-octsvg .ttl{font-family:var(--font);font-size:11.5px;font-weight:600}
+@media(max-width:600px){.oct-pip{width:170px;height:200px}}
+@media(max-width:600px){.pip-wrap{width:140px;height:140px;top:8px;right:8px}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Crystal Lab</h1>
+  <p>재료공학 결정구조 · 전위 · 슬립 시스템 인터랙티브 시각화</p>
+</div>
+<div class="main-tabs">
+  <button class="main-tab active" data-tab="crystal" onclick="switchMain('crystal')">결정구조</button>
+  <button class="main-tab" data-tab="fec" onclick="switchMain('fec')">Fe-C 상태도</button>
+  <button class="main-tab" data-tab="dislocation" onclick="switchMain('dislocation')">전위 (Dislocation)</button>
+  <button class="main-tab" data-tab="slip" onclick="switchMain('slip')">슬립 시스템 · 변형</button>
+  <button class="main-tab" data-tab="stacking" onclick="switchMain('stacking')">조밀충전 적층</button>
+</div>
+<div class="content">
+
+<!-- CRYSTAL -->
+<div class="tab-panel active" id="panel-crystal">
+  <div class="split-layout">
+    <div class="canvas-wrap" id="crystal-canvas">
+      <div class="click-overlay" id="click-overlay" style="display:none">
+        <div class="click-badge" id="click-badge">결정방향 모드</div>
+      </div>
+      <div class="coord-tooltip" id="coord-tooltip"></div>
+      <div class="pip-wrap oct-pip" id="oct-pip" style="display:none">
+        <div class="oct-pip-title" id="oct-pip-title"></div>
+        <div class="pip-label">드래그: 회전 · 스크롤: 확대</div>
+      </div>
+      <div class="canvas-hint">드래그: 회전 · 스크롤: 확대/축소 · 분석 모드에서 원자 클릭</div>
+    </div>
+    <div class="info-panel" id="crystal-info">
+      <div class="sub-tabs" id="crystal-sub-tabs">
+        <button class="sub-tab active-bcc" onclick="switchCrystal('bcc',this)">BCC</button>
+        <button class="sub-tab" onclick="switchCrystal('fcc',this)">FCC</button>
+        <button class="sub-tab" onclick="switchCrystal('hcp',this)">HCP</button>
+        <button class="sub-tab" onclick="switchCrystal('dc',this)">Diamond</button>
+      </div>
+      <h3 id="crystal-title">BCC — 체심입방</h3>
+      <div id="crystal-props"></div>
+      <div class="desc-block" id="crystal-desc"></div>
+      <div class="toggle-row" style="margin-top:12px">
+        <span>단위셀 외곽선</span>
+        <button class="toggle on" id="toggleCell" onclick="toggleCellOutline()"></button>
+      </div>
+      <div class="toggle-row">
+        <span>좌표축 표시</span>
+        <button class="toggle on" id="toggleAxes" onclick="toggleAxes()"></button>
+      </div>
+      <div id="oct-section">
+        <div class="toggle-row">
+          <span>팔면체 간극 (Octahedral site)</span>
+          <button class="toggle" id="toggleOct" onclick="toggleOctSites()"></button>
+        </div>
+        <div id="oct-options" style="display:none">
+          <div class="toggle-row">
+            <span>강체구 모델 (실제 원자 크기)</span>
+            <button class="toggle on" id="toggleHard" onclick="toggleHardSphere()"></button>
+          </div>
+          <div class="desc-block oct-info" id="oct-info" style="margin-top:6px"></div>
+        </div>
+      </div>
+      <div style="margin-top:12px;font-size:0.76rem;color:var(--text-dim)">시점 프리셋</div>
+      <div class="view-presets" id="view-presets-crystal">
+        <button class="view-btn active-view" onclick="setView('crystal','textbook',this)">교과서</button>
+        <button class="view-btn" onclick="setView('crystal','front',this)">x축 정면</button>
+        <button class="view-btn" onclick="setView('crystal','right',this)">y축 정면</button>
+        <button class="view-btn" onclick="setView('crystal','top',this)">z축 위에서</button>
+        <button class="view-btn" onclick="setView('crystal','iso',this)">등축측</button>
+      </div>
+      <div style="margin-top:12px;font-size:0.76rem;color:var(--text-dim)">대표 재료</div>
+      <div class="examples-grid" id="crystal-examples"></div>
+
+      <div class="mode-selector">
+        <h4>결정방향 · 결정면 분석</h4>
+        <div class="mode-btns">
+          <button class="mode-btn" id="btn-dir" onclick="setAnalysisMode('direction')">결정방향 [uvw]</button>
+          <button class="mode-btn" id="btn-plane" onclick="setAnalysisMode('plane')">결정면 (hkl)</button>
+          <button class="mode-btn" id="btn-off" onclick="setAnalysisMode('off')" style="flex:0.5">끄기</button>
+        </div>
+        <div id="analysis-guide" style="font-size:0.75rem;color:var(--text-dim);margin-bottom:8px;display:none"></div>
+        <div class="selected-pts" id="selected-pts" style="display:none">
+          <span style="color:var(--text-dim)">원자를 클릭하세요</span>
+        </div>
+        <div class="result-box" id="result-box" style="display:none">
+          <div class="result-miller" id="result-miller"></div>
+          <div class="result-label" id="result-label"></div>
+        </div>
+        <button class="btn-clear" id="btn-clear" onclick="clearSelection()" style="display:none">선택 초기화</button>
+      </div>
+
+      <!-- Miller Index Input -->
+      <div class="miller-input-section">
+        <h4>Miller 지수 입력 → 시각화</h4>
+        <div class="miller-type-btns">
+          <button class="miller-type-btn active" id="mi-type-dir" onclick="setMillerInputType('dir')">결정방향 [uvw]</button>
+          <button class="miller-type-btn" id="mi-type-plane" onclick="setMillerInputType('plane')">결정면 (hkl)</button>
+        </div>
+        <div class="miller-row">
+          <span class="miller-bracket" id="mi-bracket-l">[</span>
+          <input class="miller-idx" id="mi-1" type="number" value="1" onkeydown="if(event.key==='Enter')showMillerInput()">
+          <input class="miller-idx" id="mi-2" type="number" value="1" onkeydown="if(event.key==='Enter')showMillerInput()">
+          <input class="miller-idx" id="mi-3" type="number" value="0" onkeydown="if(event.key==='Enter')showMillerInput()">
+          <span class="miller-bracket" id="mi-bracket-r">]</span>
+          <button class="miller-show-btn" onclick="showMillerInput()">표시</button>
+          <button class="miller-clear-btn" onclick="clearMillerVis()">지우기</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div style="padding:20px 24px">
+    <table class="compare-table">
+      <tr><th></th><th class="col-bcc">BCC</th><th class="col-fcc">FCC</th><th class="col-hcp">HCP</th><th class="col-dc">Diamond</th></tr>
+      <tr><td style="text-align:left;color:var(--text-dim)">단위셀 원자 수</td><td>2</td><td>4</td><td>6</td><td>8</td></tr>
+      <tr><td style="text-align:left;color:var(--text-dim)">배위수 (CN)</td><td>8</td><td>12</td><td>12</td><td>4</td></tr>
+      <tr><td style="text-align:left;color:var(--text-dim)">충전율 (APF)</td><td>0.68</td><td>0.74</td><td>0.74</td><td>0.34</td></tr>
+      <tr><td style="text-align:left;color:var(--text-dim)">a와 r 관계</td><td>a=4r/√3</td><td>a=2√2·r</td><td>a=2r</td><td>a=8r/√3</td></tr>
+      <tr><td style="text-align:left;color:var(--text-dim)">슬립 시스템 수</td><td>48</td><td>12</td><td>3 (basal)</td><td>12</td></tr>
+      <tr><td style="text-align:left;color:var(--text-dim)">연성</td><td>중간</td><td>높음</td><td>낮음</td><td>극히 낮음(취성)</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- Fe-C PHASE DIAGRAM -->
+<div class="tab-panel" id="panel-fec">
+  <div class="split-layout fec-layout">
+    <div class="fec-diagram-wrap">
+      <div class="fec-toolbar">
+        <span>보기 범위</span>
+        <div class="view-presets" id="fec-zoom">
+          <button class="view-btn active-view" onclick="setFecZoom('full',this)">전체 0–6.67%</button>
+          <button class="view-btn" onclick="setFecZoom('steel',this)">강 0–2.2%</button>
+          <button class="view-btn" onclick="setFecZoom('low',this)">저탄소 0–0.25% (α·δ·포정)</button>
+        </div>
+      </div>
+      <div class="fec-svg-box" id="fec-svg-box">
+        <svg id="fec-svg" viewBox="0 0 720 640" role="img" aria-label="Fe-C 상태도"></svg>
+        <div class="fec-tip" id="fec-tip"></div>
+      </div>
+      <div class="fec-legend">
+        <span><i style="background:#f59e42"></i>α 페라이트</span><span><i style="background:#5ba4f5"></i>γ 오스테나이트</span>
+        <span><i style="background:#f5d042"></i>δ 페라이트</span><span><i style="background:#f06070"></i>L 액상</span>
+        <span><i style="background:#9aa0ae"></i>Fe₃C 시멘타이트</span>
+        <span><i style="background:repeating-linear-gradient(45deg,#f59e42 0 3px,#9aa0ae 3px 6px)"></i>2상 영역 (줄무늬)</span>
+        <span>· 영역을 클릭하면 오른쪽에 상세 정보</span>
+      </div>
+    </div>
+    <div class="info-panel fec-info" id="fec-info">
+      <div id="fec-head"></div>
+      <div id="fec-lever"></div>
+      <div class="fec-section" id="fec-3d-section" style="display:none">
+        <h4>단위격자 + 침입형 탄소</h4>
+        <div class="fec-3d" id="fec-3d"><div class="canvas-hint">드래그: 회전 · 스크롤: 확대</div></div>
+        <div class="fec-3d-legend">
+          <span><i style="background:#262626;box-shadow:0 0 0 1.5px #fff"></i>C (점유된 팔면체 간극)</span>
+          <span><i style="background:#ff5577;opacity:0.7"></i>빈 팔면체 간극</span>
+          <span><i style="background:#44ddff;opacity:0.7"></i>빈 사면체 간극</span>
+        </div>
+        <div class="fec-note" id="fec-3d-note"></div>
+        <div class="toggle-row"><span>강체구 모델 (실제 크기: Fe 0.124 / C 0.077 nm)</span><button class="toggle" id="fec-t-hard" onclick="setFecToggle('hard')"></button></div>
+        <div class="toggle-row"><span>사면체 간극 표시</span><button class="toggle" id="fec-t-tetra" onclick="setFecToggle('tetra')"></button></div>
+        <div class="toggle-row" id="fec-t-bct-row"><span>정방정 변형 (BCT, c/a 과장)</span><button class="toggle" id="fec-t-bct" onclick="setFecToggle('bct')"></button></div>
+        <div class="fec-note">원자 크기는 축소 모델에서도 Fe : C = 1 : 0.62 비율을 유지합니다.</div>
+      </div>
+      <div id="fec-card"></div>
+      <div class="fec-section" id="fec-inter" style="display:none">
+        <h4>간극 정보 (R = Fe 원자 반경)</h4>
+        <table class="fec-table" id="fec-inter-table">
+          <tr><th></th><th class="c-bcc">BCC (α, δ)</th><th class="c-fcc">FCC (γ)</th></tr>
+          <tr><td>팔면체 간극 크기</td><td class="c-bcc">0.155R<br><small>비대칭·찌그러짐</small></td><td class="c-fcc">0.414R<br><small>대칭</small></td></tr>
+          <tr><td>사면체 간극 크기</td><td class="c-bcc">0.291R</td><td class="c-fcc">0.225R</td></tr>
+          <tr><td>간극 반경 (nm)<br><small>팔면체 / 사면체</small></td><td class="c-bcc">0.019 / 0.036</td><td class="c-fcc">0.051 / 0.028</td></tr>
+          <tr><td>단위셀당 개수<br><small>팔면체 / 사면체</small></td><td class="c-bcc">6 / 12</td><td class="c-fcc">4 / 8</td></tr>
+          <tr><td>팔면체 간극 위치</td><td class="c-bcc">면 중심, 모서리 중점</td><td class="c-fcc">체심, 모서리 중점</td></tr>
+          <tr><td>최대 C 고용도</td><td class="c-bcc">0.022 wt% (α)<br><small>0.09 wt% (δ)</small></td><td class="c-fcc">2.14 wt%</td></tr>
+        </table>
+        <div class="desc-block">
+          <strong>BCC 팔면체 간극이 찌그러진 이유</strong>
+          <svg class="fec-octsvg" viewBox="0 0 340 208"><text class="ttl" x="92" y="16" text-anchor="middle" style="fill:#f59e42">BCC — 찌그러짐</text><circle cx="92.0" cy="79.7" r="28" fill="#f59e42" fill-opacity="0.22" stroke="#f59e42" stroke-width="1.2"/><circle cx="92.0" cy="144.3" r="28" fill="#f59e42" fill-opacity="0.22" stroke="#f59e42" stroke-width="1.2"/><circle cx="46.3" cy="112.0" r="28" fill="#f59e42" fill-opacity="0.22" stroke="#f59e42" stroke-width="1.2"/><circle cx="137.7" cy="112.0" r="28" fill="#f59e42" fill-opacity="0.22" stroke="#f59e42" stroke-width="1.2"/><circle cx="92" cy="112" r="17.4" fill="none" stroke="#8a93a8" stroke-dasharray="3 3"/><circle cx="92" cy="112" r="4.3" fill="#ff5577"/><line x1="92" y1="112" x2="92" y2="79.7" stroke="#ff4466" stroke-width="1.5"/><line x1="92" y1="112" x2="137.7" y2="112" stroke="#9aa3b5" stroke-width="1.5"/><text class="ttl" x="256" y="16" text-anchor="middle" style="fill:#5ba4f5">FCC — 대칭</text><circle cx="256.0" cy="72.4" r="28" fill="#5ba4f5" fill-opacity="0.22" stroke="#5ba4f5" stroke-width="1.2"/><circle cx="256.0" cy="151.6" r="28" fill="#5ba4f5" fill-opacity="0.22" stroke="#5ba4f5" stroke-width="1.2"/><circle cx="216.4" cy="112.0" r="28" fill="#5ba4f5" fill-opacity="0.22" stroke="#5ba4f5" stroke-width="1.2"/><circle cx="295.6" cy="112.0" r="28" fill="#5ba4f5" fill-opacity="0.22" stroke="#5ba4f5" stroke-width="1.2"/><circle cx="256" cy="112" r="17.4" fill="none" stroke="#8a93a8" stroke-dasharray="3 3"/><circle cx="256" cy="112" r="11.6" fill="#ff5577"/><line x1="256" y1="112" x2="256" y2="72.4" stroke="#ff4466" stroke-width="1.5"/><line x1="256" y1="112" x2="295.6" y2="112" stroke="#9aa3b5" stroke-width="1.5"/><text x="98" y="88">a/2</text><text x="122" y="106">a/√2</text><text x="262" y="84">a/2</text><text x="282" y="106">a/2</text><text x="92" y="200" text-anchor="middle">0.155R (위아래 2개가 제한)</text><text x="256" y="200" text-anchor="middle">0.414R (6개 모두 같음)</text></svg>
+          BCC 팔면체 간극의 이웃 원자 6개 중 <strong>2개는 a/2</strong>, <strong>4개는 a/√2</strong> 거리에 있습니다. 가까운 2개가 간극을 제한하므로
+          r = a/2 − R = (2/√3 − 1)R ≈ 0.155R. 반면 FCC는 6개 모두 a/2 거리라 r = (√2 − 1)R ≈ 0.414R. 점선 원은 탄소(0.62R)입니다.<br><br>
+          BCC는 사면체 간극(0.291R)이 더 큰데도 탄소는 팔면체 간극에 들어갑니다. 팔면체 간극은 <strong>가까운 Fe 2개만 밀어내면</strong> 되지만 사면체 간극은 4개를 밀어내야 해서 변형 에너지가 더 크기 때문입니다.
+        </div>
+      </div>
+      <div class="fec-section" id="fec-ss" style="display:none">
+        <h4>침입형 고용체</h4>
+        <table class="fec-table">
+          <tr><th></th><th>치환형</th><th>침입형</th></tr>
+          <tr><td>용질 위치</td><td>격자점의 모원자 대체</td><td>원자 사이 간극</td></tr>
+          <tr><td>크기 조건</td><td>반경 차 ±15% 이내<br><small>(Hume-Rothery)</small></td><td>용질 ≤ 모원자의 ~59%</td></tr>
+          <tr><td>예</td><td>Cu–Ni, Fe–Cr, Fe–Ni</td><td>Fe–C, Fe–N, Fe–H</td></tr>
+          <tr><td>고용도</td><td>전율 고용 가능</td><td>대개 작음</td></tr>
+          <tr><td>확산</td><td>빈자리 기구 (느림)</td><td>간극 확산 (빠름)</td></tr>
+        </table>
+        <div class="desc-block">
+          <strong>탄소는 경계선상의 침입형 원자</strong>: r<sub>C</sub>/r<sub>Fe</sub> = 0.077/0.124 ≈ <strong>0.62</strong>로 59% 기준을 이미 넘고, 어떤 간극보다도 큽니다. 그래서 탄소가 들어가면 주변 Fe를 밀어내 큰 변형을 만들고, 간극이 작은 BCC에서는 고용도가 0.022 wt%로 매우 작습니다.<br><br>
+          <strong>정방정 변형 (tetragonal distortion)</strong>: BCC 팔면체 간극의 탄소는 짧은 축(a/2) 방향의 Fe 2개를 밀어내 그 축만 늘립니다. 탄소가 한 방향(예: z) 간극에 정렬하면 격자 전체가 <strong>체심정방정(BCT)</strong>이 되며, c/a ≈ 1 + 0.045·(wt% C)입니다. 위 3D 뷰의 "정방정 변형" 토글은 이를 과장해 보여 줍니다.<br><br>
+          <strong>마르텐사이트 경화와의 연결</strong>: γ에 녹아 있던 탄소(최대 2.14 wt%)는 급랭 시 확산할 시간이 없어 BCC 격자에 그대로 갇힙니다. 이 과포화 탄소가 만드는 BCT 변형장이 <strong>전위 이동을 강하게 방해</strong>해 경도가 크게 오릅니다. 그래서 마르텐사이트 경도는 탄소량에 크게 좌우됩니다 (약 0.6 wt% C 이상에서 약 65 HRC).
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DISLOCATION -->
+<div class="tab-panel" id="panel-dislocation">
+  <div class="split-layout">
+    <div class="canvas-wrap" id="disloc-canvas">
+      <div class="canvas-hint">드래그: 회전 · 스크롤: 확대/축소</div>
+    </div>
+    <div class="info-panel" id="disloc-info">
+      <div class="sub-tabs">
+        <button class="sub-tab active-edge" onclick="switchDisloc('edge',this)">칼날 전위 (Edge)</button>
+        <button class="sub-tab" onclick="switchDisloc('screw',this)">나사 전위 (Screw)</button>
+      </div>
+      <h3 id="disloc-title">칼날 전위</h3>
+      <div id="disloc-props"></div>
+      <div class="desc-block" id="disloc-desc"></div>
+      <div class="anim-controls">
+        <button class="anim-btn" id="btnAnimate" onclick="toggleDislocAnim()">▶ 전위 이동 재생</button>
+        <button class="anim-btn" onclick="resetDislocAnim()">↺ 초기화</button>
+      </div>
+      <div class="speed-control">
+        <label>애니메이션 속도</label>
+        <input type="range" min="1" max="10" value="5" id="animSpeed">
+      </div>
+      <div class="desc-block" style="margin-top:14px">
+        <strong>버거스 벡터 (b)</strong>가 빨간 화살표로 표시됩니다.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SLIP -->
+<div class="tab-panel" id="panel-slip">
+  <div class="split-layout">
+    <div class="canvas-wrap" id="slip-canvas">
+      <div class="canvas-hint">드래그: 회전 · 스크롤: 확대/축소</div>
+    </div>
+    <div class="info-panel" id="slip-info">
+      <div class="sub-tabs">
+        <button class="sub-tab active-bcc" onclick="switchSlip('bcc',this)">BCC</button>
+        <button class="sub-tab" onclick="switchSlip('fcc',this)">FCC</button>
+        <button class="sub-tab" onclick="switchSlip('hcp',this)">HCP</button>
+      </div>
+      <h3 id="slip-title">BCC 슬립 시스템</h3>
+      <div id="slip-content"></div>
+      <div style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px">
+        <h3 style="font-size:0.92rem;margin-bottom:10px">Schmid Factor 계산기</h3>
+        <div style="font-size:0.76rem;color:var(--text-dim);margin-bottom:6px">φ = 인장축↔슬립면 법선, λ = 인장축↔슬립방향</div>
+        <div class="schmid-input">
+          <label>φ</label><input type="number" id="phi" value="45" min="0" max="90" onchange="calcSchmid()"><span style="font-size:0.73rem;color:var(--text-dim)">°</span>
+          <label>λ</label><input type="number" id="lambda" value="45" min="0" max="90" onchange="calcSchmid()"><span style="font-size:0.73rem;color:var(--text-dim)">°</span>
+        </div>
+        <div class="schmid-result" id="schmid-result">m = 0.500</div>
+        <div class="desc-block"><strong>Schmid's Law:</strong> τ = σ·cos(φ)·cos(λ). 최대 m = 0.5 (φ=λ=45°).</div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- CLOSE-PACKED STACKING -->
+<div class="tab-panel" id="panel-stacking">
+  <div class="split-layout">
+    <div class="canvas-wrap" id="stack-canvas">
+      <div class="pip-wrap" id="pip-canvas">
+        <div class="pip-label" id="pip-label">FCC 단위격자</div>
+      </div>
+      <div class="canvas-hint">드래그: 회전 · 스크롤: 확대/축소</div>
+    </div>
+    <div class="info-panel" id="stack-info">
+      <div class="sub-tabs" id="stack-sub-tabs">
+        <button class="sub-tab active-fcc" onclick="switchStacking('fcc',this)">FCC — ABCABC...</button>
+        <button class="sub-tab" onclick="switchStacking('hcp',this)">HCP — ABABAB...</button>
+      </div>
+      <h3 id="stack-title">FCC 적층 — ABCABC...</h3>
+      <div style="font-size:0.8rem;color:var(--text-dim);margin-bottom:12px" id="stack-desc">
+        FCC는 조밀충전면 {111}을 <strong>A→B→C→A→B→C</strong> 순서로 적층한 구조입니다. 세 번째 층(C)이 첫 번째 층(A)과 다른 위치에 놓여 3층 주기를 가집니다.
+      </div>
+
+      <div style="font-size:0.76rem;color:var(--text-dim);margin-bottom:4px">적층 순서</div>
+      <div class="stacking-seq" id="stacking-seq"></div>
+
+      <div style="font-size:0.76rem;color:var(--text-dim);margin-top:12px;margin-bottom:4px">층 수 조절</div>
+      <div class="layer-controls">
+        <button class="layer-btn" id="btnLayerMinus" onclick="changeLayerCount(-1)">−</button>
+        <div class="layer-counter" id="layer-counter">4 층</div>
+        <button class="layer-btn" id="btnLayerPlus" onclick="changeLayerCount(1)">+</button>
+      </div>
+
+      <div class="desc-block" id="stack-detail">
+        <strong>A층</strong> <span style="color:#5ba4f5">●</span> : 기준층. 원자가 육각형 배열.<br>
+        <strong>B층</strong> <span style="color:#f59e42">●</span> : A층의 삼각형 빈 공간(hollow) 위에 배치.<br>
+        <strong>C층</strong> <span style="color:#e05080">●</span> : A, B 어디에도 겹치지 않는 나머지 hollow 위에 배치.<br><br>
+        FCC: A→B→C 반복 (3층 주기)<br>
+        HCP: A→B→A 반복 (2층 주기, C 위치 사용 안 함)
+      </div>
+
+      <div class="toggle-row" style="margin-top:14px">
+        <span>층 사이 간격 벌리기</span>
+        <button class="toggle" id="toggleSpread" onclick="toggleSpread()"></button>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+// ===== DATA =====
+const crystalData = {
+  bcc: {
+    title:'BCC — 체심입방', color:'#f59e42',
+    props:[['구조','Body-Centered Cubic'],['단위셀 원자 수','2  (8×⅛ + 1)'],['배위수','8'],['충전율 (APF)','0.68'],['격자 상수','a = 4r/√3'],['슬립면','{110}, {112}, {123}'],['슬립방향','⟨111⟩'],['슬립 시스템 수','48']],
+    desc:'BCC 구조는 입방체 꼭짓점 8개와 중심 1개의 원자로 구성됩니다. <strong>충전율 0.68</strong>로 FCC/HCP보다 낮고, 저온에서 <strong>연성-취성 전이(DBTT)</strong>를 보입니다.',
+    examples:['Fe(α)','W','Cr','Mo','V','Na'],
+    atoms:[[0,0,0],[1,0,0],[0,1,0],[0,0,1],[1,1,0],[1,0,1],[0,1,1],[1,1,1],[.5,.5,.5]]
+  },
+  fcc: {
+    title:'FCC — 면심입방', color:'#5ba4f5',
+    props:[['구조','Face-Centered Cubic'],['단위셀 원자 수','4  (8×⅛ + 6×½)'],['배위수','12'],['충전율 (APF)','0.74'],['격자 상수','a = 2√2·r'],['슬립면','{111}'],['슬립방향','⟨110⟩'],['슬립 시스템 수','12']],
+    desc:'FCC는 <strong>최밀충전 구조</strong>(APF 0.74). {111}면을 따라 ⟨110⟩ 방향으로 슬립. 12개 슬립 시스템이 <strong>높은 연성</strong> 제공. 적층순서 ABCABC...',
+    examples:['Al','Cu','Au','Ag','Ni','Pb'],
+    atoms:[[0,0,0],[1,0,0],[0,1,0],[0,0,1],[1,1,0],[1,0,1],[0,1,1],[1,1,1],[.5,.5,0],[.5,0,.5],[0,.5,.5],[1,.5,.5],[.5,1,.5],[.5,.5,1]]
+  },
+  hcp: {
+    title:'HCP — 조밀육방', color:'#6dd4a0',
+    props:[['구조','Hexagonal Close-Packed'],['단위셀 원자 수','6'],['배위수','12'],['충전율 (APF)','0.74'],['격자 상수','c/a = 1.633 (이상적)'],['슬립면','(0001)'],['슬립방향','⟨112̄0⟩'],['기저 슬립 시스템','3']],
+    desc:'HCP는 적층순서 ABABAB..., 기저면 (0001) 슬립. 슬립 시스템 3개뿐이라 <strong>연성이 낮고</strong> 쌍정(twinning) 중요. Miller-Bravais 지수 (hkil) 사용.',
+    examples:['Mg','Zn','Ti(α)','Co','Zr','Be'], atoms:null
+  },
+  dc: {
+    title:'Diamond Cubic — 다이아몬드 입방', color:'#a855f7',
+    props:[['구조','Diamond Cubic (FCC + 2원자 기저)'],['단위셀 원자 수','8  (8×⅛ + 6×½ + 4)'],['배위수 (CN)','4 (사면체 배위, sp³ 결합)'],['충전율 (APF)','0.34 (개방적 격자 구조)'],['격자 상수','a = 8r/√3'],['슬립면','{111}'],['슬립방향','⟨110⟩'],['슬립 시스템 수','12 (상온 취성, 고온 슬립)']],
+    desc:'Diamond Cubic 구조는 FCC 격자에 <strong>(¼, ¼, ¼)만큼 이동한 2원자 기저</strong>가 결합된 형태입니다. 각 원자가 인접한 4개의 원자와 <strong>강력한 사면체 공유결합(sp³)</strong>을 이룹니다. 충전율(0.34)은 낮으나 결합 에너지가 매우 커서 <strong>높은 경도, 취성, 반도체 밴드갭</strong> 특성을 나타냅니다.',
+    examples:['Si','Ge','C(다이아몬드)','α-Sn'],
+    atoms:[
+      [0,0,0],[1,0,0],[0,1,0],[0,0,1],[1,1,0],[1,0,1],[0,1,1],[1,1,1],
+      [.5,.5,0],[.5,0,.5],[0,.5,.5],[1,.5,.5],[.5,1,.5],[.5,.5,1],
+      [.25,.25,.25],[.75,.75,.25],[.75,.25,.75],[.25,.75,.75]
+    ]
+  }
+};
+const dislocData = {
+  edge:{title:'칼날 전위 — Edge Dislocation',color:'#f06070',
+    props:[['유형','Edge'],['b 방향','전위선에 ⊥'],['이동','b 방향 글라이드'],['글라이드면','전위선 + b'],['클라임','가능']],
+    desc:'<strong>여분의 반면(extra half-plane)</strong>이 삽입된 형태. 위쪽 압축, 아래쪽 인장. b는 전위선에 수직.'},
+  screw:{title:'나사 전위 — Screw Dislocation',color:'#b07af5',
+    props:[['유형','Screw'],['b 방향','전위선에 ∥'],['이동','전위선에 수직'],['글라이드면','전위선 포함 모든 면'],['교차 슬립','가능']],
+    desc:'원자면이 <strong>나선형 경사면</strong> 형성. b가 전위선에 평행하므로 <strong>교차 슬립(cross-slip)</strong> 가능.'}
+};
+const slipData = {
+  bcc:{title:'BCC 슬립 시스템',content:'<div class="slip-card"><h4>주요 슬립</h4><div class="slip-formula">{110}⟨111⟩ — 12개</div><div style="font-size:0.78rem;color:var(--text-dim);line-height:1.5;margin-top:6px">가장 조밀한 {110}면에서 ⟨111⟩ 방향 슬립.</div></div><div class="slip-card"><h4>추가 슬립</h4><div class="slip-formula">{112}⟨111⟩ — 12개</div><div class="slip-formula">{123}⟨111⟩ — 24개</div><div style="font-size:0.78rem;color:var(--text-dim);line-height:1.5;margin-top:6px">총 48개. <strong>연필 글라이드(pencil glide)</strong> 현상.</div></div>'},
+  fcc:{title:'FCC 슬립 시스템',content:'<div class="slip-card"><h4>슬립 시스템</h4><div class="slip-formula">{111}⟨110⟩ — 12개</div><div style="font-size:0.78rem;color:var(--text-dim);line-height:1.5;margin-top:6px">4개 {111}면 × 3개 ⟨110⟩ 방향 = 12개.</div></div><div class="slip-card"><h4>부분 전위</h4><div class="slip-formula">a/2[110] → a/6[211] + a/6[12̄1]</div><div style="font-size:0.78rem;color:var(--text-dim);line-height:1.5;margin-top:6px"><strong>Shockley 부분 전위</strong> 분리 → 적층결함(SF).</div></div>'},
+  hcp:{title:'HCP 슬립 시스템',content:'<div class="slip-card"><h4>기저면 슬립</h4><div class="slip-formula">(0001)⟨112̄0⟩ — 3개</div><div style="font-size:0.78rem;color:var(--text-dim);line-height:1.5;margin-top:6px">von Mises 기준(5개) 미달. 연성 제한.</div></div><div class="slip-card"><h4>비기저면 슬립</h4><div class="slip-formula">{101̄0}⟨112̄0⟩ — 프리즘 3개</div><div class="slip-formula">{101̄1}⟨112̄0⟩ — 피라미드 6개</div><div style="font-size:0.78rem;color:var(--text-dim);line-height:1.5;margin-top:6px"><strong>쌍정(twinning)</strong>이 c축 변형 보완.</div></div>'}
+};
+
+// ===== THREE.JS GLOBALS =====
+let scenes={},cameras={},renderers={};
+let crystalGroup,dislocGroup,slipGroup,stackGroup;
+let currentStacking='fcc', stackLayerCount=4, stackSpread=false;
+let pipScene, pipCamera, pipRenderer, pipGroup;
+let pipCamState={theta:1.05, phi:0.45, radius:5.5};
+let pipMouseDown=false, pipLastMouse={x:0,y:0};
+let currentCrystal='bcc',currentDisloc='edge',currentSlip='bcc';
+let showCellOutline=true,showAxes=true;
+let dislocAnimating=false,dislocPhase=0;
+let mouseDown=false,lastMouse={x:0,y:0},isDragging=false;
+
+// Spherical camera coordinates: {theta, phi, radius}
+// camera.up = (0,0,1) so z points up on screen.
+// theta = polar angle from +z axis (0=top, PI=bottom)
+// phi = azimuthal angle in xy-plane from +x axis
+// cam.x = r*sin(theta)*cos(phi), cam.y = r*sin(theta)*sin(phi), cam.z = r*cos(theta)
+// Visual result: x→toward viewer(front), y→right, z→up
+const VIEW_PRESETS = {
+  // Textbook: looking along -x (from +x side), slightly from above and right
+  textbook: { theta: 1.10, phi: 0.40, radius: 6.5 },
+  // x축 정면: camera at +x looking at origin
+  front:    { theta: Math.PI/2, phi: 0, radius: 6 },
+  // y축 정면: camera at +y looking at origin
+  right:    { theta: Math.PI/2, phi: Math.PI/2, radius: 6 },
+  // z축 위: camera above looking down
+  top:      { theta: 0.05, phi: 0, radius: 6 },
+  // 등축측: equal angles to all 3 axes
+  iso:      { theta: 0.9553, phi: 0.7854, radius: 6.5 },
+};
+
+let camState = {
+  crystal:  { theta:1.10, phi:0.40, radius:6.5 },
+  disloc:   { theta:1.10, phi:0.40, radius:7.5 },
+  slip:     { theta:1.10, phi:0.40, radius:6.5 },
+  stack:    { theta:1.05, phi:0.35, radius:8 },
+};
+// Smooth animation targets
+let camTarget = {
+  crystal:null, disloc:null, slip:null, stack:null
+};
+
+// Analysis
+let analysisMode='off';
+let selectedAtoms=[];
+let directionArrow=null, planeVis=null;
+let highlightMeshes=[];
+let gridPointMeshes=[];
+const gridGeo=new THREE.SphereGeometry(0.04,8,8);
+const gridMat=new THREE.MeshBasicMaterial({color:0xaabbcc,transparent:true,opacity:0.0});
+const gridMatHover=0xffffff;
+const raycaster=new THREE.Raycaster();
+const mouse2=new THREE.Vector2();
+const ptColors=[0xff4466,0xffaa22,0x44ddff,0xaaff44];
+
+// ===== SCENE INIT =====
+function initScene(id, containerId) {
+  const container=document.getElementById(containerId);
+  const w=container.clientWidth||600, h=container.clientHeight||450;
+  const scene=new THREE.Scene();
+  const camera=new THREE.PerspectiveCamera(40,w/h,0.1,100);
+  updateCameraFromSpherical(camera, camState[id]);
+  const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+  renderer.setSize(w,h);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  container.appendChild(renderer.domElement);
+  scene.add(new THREE.AmbientLight(0xffffff,0.5));
+  const d1=new THREE.DirectionalLight(0xffffff,0.8);d1.position.set(5,5,5);scene.add(d1);
+  const d2=new THREE.DirectionalLight(0xffffff,0.3);d2.position.set(-3,-2,-3);scene.add(d2);
+  scenes[id]=scene; cameras[id]=camera; renderers[id]=renderer;
+  const cvs=renderer.domElement;
+
+  // Orbit: drag → change theta/phi
+  cvs.addEventListener('pointerdown', e=>{mouseDown=true;isDragging=false;lastMouse={x:e.clientX,y:e.clientY};cvs.setPointerCapture(e.pointerId)});
+  cvs.addEventListener('pointerup', e=>{mouseDown=false;cvs.releasePointerCapture(e.pointerId)});
+  cvs.addEventListener('pointermove', e=>{
+    if(!mouseDown){
+      if(id==='crystal'&&analysisMode!=='off') showHoverTooltip(e);
+      return;
+    }
+    const dx=e.clientX-lastMouse.x, dy=e.clientY-lastMouse.y;
+    if(Math.abs(dx)+Math.abs(dy)>3) isDragging=true;
+    const s=camState[id];
+    s.phi -= dx*0.006;
+    s.theta = Math.max(0.05, Math.min(Math.PI-0.05, s.theta - dy*0.006));
+    camTarget[id]=null; // cancel any animation
+    lastMouse={x:e.clientX,y:e.clientY};
+  });
+  cvs.addEventListener('wheel', e=>{
+    e.preventDefault();
+    camState[id].radius=Math.max(2.5,Math.min(15,camState[id].radius+e.deltaY*0.005));
+    camTarget[id]=null;
+  },{passive:false});
+
+  if(id==='crystal'){
+    cvs.addEventListener('click', e=>{ if(isDragging||analysisMode==='off') return; handleAtomClick(e); });
+  }
+  return scene;
+}
+
+function updateCameraFromSpherical(cam, s) {
+  // z-up: theta from +z, phi from +x in xy-plane
+  cam.position.set(
+    s.radius * Math.sin(s.theta) * Math.cos(s.phi),
+    s.radius * Math.sin(s.theta) * Math.sin(s.phi),
+    s.radius * Math.cos(s.theta)
+  );
+  cam.up.set(0,0,1);
+  cam.lookAt(0,0,0);
+}
+
+function setView(sceneId, preset, btn) {
+  const p = VIEW_PRESETS[preset];
+  if(!p) return;
+  camTarget[sceneId] = { theta:p.theta, phi:p.phi, radius:p.radius };
+  // Update button highlight
+  const container = btn.parentElement;
+  container.querySelectorAll('.view-btn').forEach(b=>b.classList.remove('active-view'));
+  btn.classList.add('active-view');
+}
+
+// ===== AXES =====
+// Standard: x=(1,0,0), y=(0,1,0), z=(0,0,1). Camera oriented so x→front, y→right, z→up.
+function buildAxes(group, size) {
+  if(!size) size=1.2;
+  const S=1.6, half=S/2;
+  const origin=new THREE.Vector3(-half-0.15, -half-0.15, -half-0.15);
+  const axes=[
+    {dir:new THREE.Vector3(1,0,0),color:0xff4444,label:'x'},
+    {dir:new THREE.Vector3(0,1,0),color:0x44cc44,label:'y'},
+    {dir:new THREE.Vector3(0,0,1),color:0x4488ff,label:'z'}
+  ];
+  axes.forEach(a=>{
+    const arrow=new THREE.ArrowHelper(a.dir,origin,size*1.15,a.color,size*0.11,size*0.065);
+    group.add(arrow);
+    const c=document.createElement('canvas');c.width=64;c.height=64;
+    const ctx=c.getContext('2d');
+    ctx.font='bold 44px JetBrains Mono,monospace';
+    ctx.fillStyle='#'+a.color.toString(16).padStart(6,'0');
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(a.label,32,32);
+    const mat=new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true});
+    const sp=new THREE.Sprite(mat);sp.scale.set(0.3,0.3,1);
+    sp.position.copy(origin.clone().add(a.dir.clone().multiplyScalar(size*1.35)));
+    group.add(sp);
+  });
+}
+function buildAxesHCP(group) {
+  const origin=new THREE.Vector3(-1.3,-1.0,-1.3);
+  const axes=[
+    {dir:new THREE.Vector3(1,0,0),color:0xff4444,label:'a₁'},
+    {dir:new THREE.Vector3(0,1,0),color:0x44cc44,label:'a₂'},
+    {dir:new THREE.Vector3(0,0,1),color:0x4488ff,label:'c'}
+  ];
+  axes.forEach(a=>{
+    const arrow=new THREE.ArrowHelper(a.dir,origin,1.0,a.color,0.1,0.06);
+    group.add(arrow);
+    const c=document.createElement('canvas');c.width=64;c.height=64;
+    const ctx=c.getContext('2d');ctx.font='bold 36px JetBrains Mono,monospace';
+    ctx.fillStyle='#'+a.color.toString(16).padStart(6,'0');
+    ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(a.label,32,32);
+    const mat=new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true});
+    const sp=new THREE.Sprite(mat);sp.scale.set(0.3,0.3,1);
+    sp.position.copy(origin.clone().add(a.dir.clone().multiplyScalar(1.2)));
+    group.add(sp);
+  });
+}
+
+// ===== CRYSTAL BUILDERS =====
+function makeSphere(r,color){
+  return new THREE.Mesh(new THREE.SphereGeometry(r,24,24),new THREE.MeshPhongMaterial({color,transparent:true,opacity:0.88,shininess:80}));
+}
+function makeWireBox(s,color){
+  return new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(s,s,s)),new THREE.LineBasicMaterial({color,transparent:true,opacity:0.35}));
+}
+function addAtom(group,pos3,fracCoord,r,color,special){
+  const sp=makeSphere(r,color);sp.position.copy(pos3);
+  sp.userData={frac:fracCoord,isAtom:true,special:!!special};
+  group.add(sp);return sp;
+}
+function buildCrystal(group,type){
+  const S=1.6, half=S/2;
+  if(type==='bcc'){
+    const r=octHardActive()?octAtomR('bcc'):0.2,c=0xf59e42;
+    crystalData.bcc.atoms.forEach(frac=>{
+      const pos=new THREE.Vector3(frac[0]*S-half,frac[1]*S-half,frac[2]*S-half);
+      const isC=frac[0]===.5&&frac[1]===.5&&frac[2]===.5;
+      addAtom(group,pos,frac,isC&&!octHardActive()?r*1.08:r,isC?0xffd080:c,isC);
+    });
+    if(showCellOutline) group.add(makeWireBox(S,0xf59e42));
+  } else if(type==='fcc'){
+    const r=octHardActive()?octAtomR('fcc'):0.18,c=0x5ba4f5;
+    crystalData.fcc.atoms.forEach(frac=>{
+      const pos=new THREE.Vector3(frac[0]*S-half,frac[1]*S-half,frac[2]*S-half);
+      const isFace=(frac[0]===.5||frac[1]===.5||frac[2]===.5)&&!(frac[0]===.5&&frac[1]===.5&&frac[2]===.5);
+      addAtom(group,pos,frac,isFace&&!octHardActive()?r*1.08:r,isFace?0x8ac4ff:c,isFace);
+    });
+    if(showCellOutline) group.add(makeWireBox(S,0x5ba4f5));
+  } else if(type==='dc'){
+    const r=0.16,c=0xa855f7;
+    crystalData.dc.atoms.forEach(frac=>{
+      const pos=new THREE.Vector3(frac[0]*S-half,frac[1]*S-half,frac[2]*S-half);
+      const isInterior=(frac[0]===.25||frac[0]===.75);
+      addAtom(group,pos,frac,isInterior?r*1.08:r,isInterior?0xd8b4fe:c,isInterior);
+    });
+    // Covalent bonds (tetrahedral sp3)
+    const bonds=[
+      [[.25,.25,.25],[0,0,0]], [[.25,.25,.25],[.5,.5,0]], [[.25,.25,.25],[.5,0,.5]], [[.25,.25,.25],[0,.5,.5]],
+      [[.75,.75,.25],[1,1,0]], [[.75,.75,.25],[.5,.5,0]], [[.75,.75,.25],[1,.5,.5]], [[.75,.75,.25],[.5,1,.5]],
+      [[.75,.25,.75],[1,0,1]], [[.75,.25,.75],[.5,0,.5]], [[.75,.25,.75],[1,.5,.5]], [[.75,.25,.75],[.5,.5,1]],
+      [[.25,.75,.75],[0,1,1]], [[.25,.75,.75],[0,.5,.5]], [[.25,.75,.75],[.5,1,.5]], [[.25,.75,.75],[.5,.5,1]]
+    ];
+    bonds.forEach(([f1,f2])=>{
+      const p1=new THREE.Vector3(f1[0]*S-half,f1[1]*S-half,f1[2]*S-half);
+      const p2=new THREE.Vector3(f2[0]*S-half,f2[1]*S-half,f2[2]*S-half);
+      const dir=new THREE.Vector3().subVectors(p2,p1);
+      const len=dir.length();
+      const geom=new THREE.CylinderGeometry(0.022,0.022,len,8);
+      const mat=new THREE.MeshPhongMaterial({color:0xc084fc,transparent:true,opacity:0.75,shininess:60});
+      const cyl=new THREE.Mesh(geom,mat);
+      cyl.position.copy(p1).add(dir.clone().multiplyScalar(0.5));
+      cyl.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir.clone().normalize());
+      group.add(cyl);
+    });
+    if(showCellOutline) group.add(makeWireBox(S,0xa855f7));
+  } else { // hcp
+    const a=1.0, cH=1.633*a, r=0.17;
+    for(let i=0;i<6;i++){
+      const ang=(Math.PI/3)*i;
+      addAtom(group,new THREE.Vector3(a*Math.cos(ang),-cH/2,a*Math.sin(ang)),[Math.cos(ang),0,Math.sin(ang)],r,0x6dd4a0,false);
+    }
+    addAtom(group,new THREE.Vector3(0,-cH/2,0),[0,0,0],r,0x6dd4a0,false);
+    for(let i=0;i<6;i++){
+      const ang=(Math.PI/3)*i;
+      addAtom(group,new THREE.Vector3(a*Math.cos(ang),cH/2,a*Math.sin(ang)),[Math.cos(ang),1,Math.sin(ang)],r,0x6dd4a0,false);
+    }
+    addAtom(group,new THREE.Vector3(0,cH/2,0),[0,1,0],r,0x6dd4a0,false);
+    for(let i=0;i<3;i++){
+      const ang=(Math.PI/3)*(2*i+1), px=a*0.577*Math.cos(ang), pz=a*0.577*Math.sin(ang);
+      addAtom(group,new THREE.Vector3(px,0,pz),[0.577*Math.cos(ang),0.5,0.577*Math.sin(ang)],r*1.05,0xa0e8c0,true);
+    }
+    if(showCellOutline){
+      const drawHex=(y)=>{
+        const pts=[];for(let i=0;i<=6;i++) pts.push(new THREE.Vector3(a*Math.cos((Math.PI/3)*i),y,a*Math.sin((Math.PI/3)*i)));
+        group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),new THREE.LineBasicMaterial({color:0x6dd4a0,transparent:true,opacity:0.35})));
+      };
+      drawHex(-cH/2);drawHex(cH/2);
+      for(let i=0;i<6;i++){
+        const ang=(Math.PI/3)*i;
+        group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(a*Math.cos(ang),-cH/2,a*Math.sin(ang)),
+          new THREE.Vector3(a*Math.cos(ang),cH/2,a*Math.sin(ang))
+        ]),new THREE.LineBasicMaterial({color:0x6dd4a0,transparent:true,opacity:0.25})));
+      }
+    }
+  }
+  if(showOctSites&&OCT_SITES[type]) buildOctSites(group,type);
+  if(showAxes){
+    if(type==='hcp') buildAxesHCP(group);
+    else buildAxes(group, 1.2);
+  }
+}
+
+// ===== OCTAHEDRAL INTERSTITIAL SITES =====
+// 간극 반경비 r_oct/R (강체구 모델). BCC는 짧은 축(a/2) 방향 이웃 2개가 간극을 제한해 찌그러진 팔면체가 됨.
+let showOctSites=false, octHardSphere=true;
+const edgeMidpoints=()=>{
+  const pts=[];
+  for(let ax=0;ax<3;ax++) for(const u of [0,1]) for(const v of [0,1]){
+    const p=[u,v];p.splice(ax,0,.5);pts.push(p);
+  }
+  return pts;
+};
+const OCT_SITES={
+  bcc:{
+    ratio:0.155, color:0xff5577,
+    // 면 중심 6개(×½) + 모서리 중점 12개(×¼) = 단위셀당 6개
+    sites:[[.5,.5,0],[.5,.5,1],[.5,0,.5],[.5,1,.5],[0,.5,.5],[1,.5,.5],...edgeMidpoints()],
+    // 대표 팔면체: 윗면 중심 (½,½,1). 위·아래 체심 원자 2개는 a/2, 꼭짓점 4개는 a/√2
+    rep:{center:[.5,.5,1],short:[[.5,.5,.5],[.5,.5,1.5]],long:[[0,0,1],[1,0,1],[1,1,1],[0,1,1]]}
+  },
+  fcc:{
+    ratio:0.414, color:0x44ee99,
+    // 체심 1개 + 모서리 중점 12개(×¼) = 단위셀당 4개
+    sites:[[.5,.5,.5],...edgeMidpoints()],
+    // 대표 팔면체: 체심 (½,½,½). 면심 원자 6개 모두 a/2 — 정팔면체
+    rep:{center:[.5,.5,.5],short:[],long:[[.5,.5,0],[.5,.5,1],[.5,0,.5],[.5,1,.5],[0,.5,.5],[1,.5,.5]]}
+  }
+};
+// 강체구 원자 반경 (S = 격자상수 a): BCC a=4R/√3, FCC a=2√2R
+function octAtomR(type){const S=1.6;return type==='bcc'?Math.sqrt(3)/4*S:Math.sqrt(2)/4*S}
+function octHardActive(){return showOctSites&&octHardSphere&&!!OCT_SITES[currentCrystal]}
+function makeTextSprite(text,color,scale){
+  const c=document.createElement('canvas');c.width=256;c.height=96;
+  const ctx=c.getContext('2d');
+  ctx.font='600 52px JetBrains Mono,monospace';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.lineWidth=8;ctx.strokeStyle='rgba(0,0,0,0.75)';ctx.strokeText(text,128,48);
+  ctx.fillStyle=color;ctx.fillText(text,128,48);
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true,depthTest:false}));
+  sp.scale.set(scale*2.67,scale,1);sp.renderOrder=10;
+  return sp;
+}
+function buildOctSites(group,type){
+  const S=1.6, half=S/2, d=OCT_SITES[type];
+  const toPos=f=>new THREE.Vector3(f[0]*S-half,f[1]*S-half,f[2]*S-half);
+  const R=octHardSphere?octAtomR(type):(type==='bcc'?0.2:0.18);
+  const rOct=d.ratio*R;
+  // 강체구 모드: 원자를 투명하게 해서 내부 간극이 보이도록
+  if(octHardSphere){
+    group.children.forEach(c=>{if(c.userData&&c.userData.isAtom){c.material.opacity=0.16;c.material.depthWrite=false}});
+  }
+  const siteGeo=new THREE.SphereGeometry(rOct,24,24);
+  const repKey=d.rep.center.join(',');
+  d.sites.forEach(f=>{
+    const isRep=f.join(',')===repKey;
+    const m=new THREE.Mesh(siteGeo,new THREE.MeshPhongMaterial({color:d.color,emissive:d.color,emissiveIntensity:isRep?0.6:0.35,transparent:true,opacity:isRep?0.95:0.5,shininess:90}));
+    m.position.copy(toPos(f));m.userData={isOctSite:true,frac:f};
+    group.add(m);
+  });
+  rebuildOctPip();
+}
+
+// ----- 팔면체 확대 보조 창 (PiP) -----
+const octPip={scene:null,camera:null,renderer:null,group:null,cam:{theta:1.25,phi:0.55,radius:3.9},down:false,last:{x:0,y:0}};
+function initOctPip(){
+  const container=document.getElementById('oct-pip');
+  const P=octPip;
+  P.scene=new THREE.Scene();
+  P.camera=new THREE.PerspectiveCamera(38,260/290,0.1,50);
+  P.renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+  P.renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  P.renderer.setSize(260,290);
+  container.insertBefore(P.renderer.domElement,container.firstChild);
+  P.scene.add(new THREE.AmbientLight(0xffffff,0.55));
+  const d1=new THREE.DirectionalLight(0xffffff,0.8);d1.position.set(4,4,5);P.scene.add(d1);
+  const d2=new THREE.DirectionalLight(0xffffff,0.3);d2.position.set(-3,-2,-3);P.scene.add(d2);
+  P.group=new THREE.Group();P.scene.add(P.group);
+  const cvs=P.renderer.domElement;
+  cvs.addEventListener('pointerdown',e=>{P.down=true;P.last={x:e.clientX,y:e.clientY};cvs.setPointerCapture(e.pointerId);e.stopPropagation()});
+  cvs.addEventListener('pointerup',e=>{P.down=false;cvs.releasePointerCapture(e.pointerId);e.stopPropagation()});
+  cvs.addEventListener('pointermove',e=>{
+    if(!P.down)return;e.stopPropagation();
+    P.cam.phi-=(e.clientX-P.last.x)*0.008;
+    P.cam.theta=Math.max(0.05,Math.min(Math.PI-0.05,P.cam.theta-(e.clientY-P.last.y)*0.008));
+    P.last={x:e.clientX,y:e.clientY};
+  });
+  cvs.addEventListener('wheel',e=>{e.preventDefault();e.stopPropagation();P.cam.radius=Math.max(2.5,Math.min(9,P.cam.radius+e.deltaY*0.005))},{passive:false});
+}
+function resizeOctPip(){
+  const c=document.getElementById('oct-pip'), P=octPip;
+  if(!P.renderer||!c.clientWidth)return;
+  P.camera.aspect=c.clientWidth/c.clientHeight;P.camera.updateProjectionMatrix();
+  P.renderer.setSize(c.clientWidth,c.clientHeight);
+}
+function rebuildOctPip(){
+  const P=octPip, type=currentCrystal, d=OCT_SITES[type];
+  if(!P.group||!d)return;
+  clearGroup(P.group);
+  const S=1.6, c=d.rep.center, R=octAtomR(type);
+  const rel=f=>new THREE.Vector3((f[0]-c[0])*S,(f[1]-c[1])*S,(f[2]-c[2])*S);
+  const verts=[...d.rep.short,...d.rep.long], vp=verts.map(rel), O=new THREE.Vector3();
+  const atomCol=type==='bcc'?0xf59e42:0x8ac4ff, shortCol=0xffd080;
+  // 이웃 원자: 팔면체 모양이 잘 보이도록 작은 심으로만 표시
+  verts.forEach((f,i)=>{
+    const core=makeSphere(0.1,i<d.rep.short.length?shortCol:atomCol);core.material.opacity=1;core.position.copy(vp[i]);P.group.add(core);
+  });
+  // 팔면체 면(반투명)과 모서리: 마주보지 않는 꼭짓점끼리 연결
+  const adj=(i,j)=>vp[i].clone().add(vp[j]).length()>1e-3;
+  const edgePts=[], facePts=[];
+  for(let i=0;i<6;i++)for(let j=i+1;j<6;j++){
+    if(!adj(i,j))continue;
+    edgePts.push(vp[i],vp[j]);
+    for(let k=j+1;k<6;k++) if(adj(i,k)&&adj(j,k)) facePts.push(vp[i],vp[j],vp[k]);
+  }
+  const faceGeo=new THREE.BufferGeometry().setFromPoints(facePts);
+  P.group.add(new THREE.Mesh(faceGeo,new THREE.MeshBasicMaterial({color:d.color,transparent:true,opacity:0.1,side:THREE.DoubleSide,depthWrite:false})));
+  P.group.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(edgePts),new THREE.LineBasicMaterial({color:0x9aa3b5,transparent:true,opacity:0.9})));
+  // 중심 → 이웃 거리선
+  const spokes=(pts,col)=>{const a=[];pts.forEach(p=>a.push(O,p));P.group.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(a),new THREE.LineBasicMaterial({color:col,depthTest:false,transparent:true,opacity:0.95})))};
+  const nS=d.rep.short.length;
+  if(nS) spokes(vp.slice(0,nS),0xff4466);
+  spokes(vp.slice(nS),type==='bcc'?0x9aa3b5:0x1fb874);
+  // 간극 구 (강체구 기준 실제 비율) + 탄소 원자 크기 비교용 와이어 구 (Fe 기준 r_C ≈ 0.62R)
+  const site=new THREE.Mesh(new THREE.SphereGeometry(d.ratio*R,32,32),new THREE.MeshPhongMaterial({color:d.color,emissive:d.color,emissiveIntensity:0.5,shininess:90}));
+  site.renderOrder=3;P.group.add(site);
+  const rc=document.createElement('canvas');rc.width=rc.height=256;
+  const rctx=rc.getContext('2d');rctx.strokeStyle='#8a93a8';rctx.lineWidth=5;rctx.setLineDash([14,10]);
+  rctx.beginPath();rctx.arc(128,128,124,0,Math.PI*2);rctx.stroke();
+  const carbon=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(rc),transparent:true,depthTest:false,opacity:0.85}));
+  carbon.scale.set(1.24*R,1.24*R,1);P.group.add(carbon);
+  // 거리 라벨
+  if(type==='bcc'){
+    const s1=makeTextSprite('a/2','#ff6688',0.22);s1.position.copy(vp[1].clone().multiplyScalar(0.5)).add(new THREE.Vector3(0.2,0.2,0));P.group.add(s1);
+    const s2=makeTextSprite('a/√2','#b8c0d0',0.22);s2.position.copy(vp[3].clone().multiplyScalar(0.55)).add(new THREE.Vector3(0,0,0.18));P.group.add(s2);
+  } else {
+    const s1=makeTextSprite('a/2','#3ddc8f',0.22);s1.position.copy(vp[1].clone().multiplyScalar(0.5)).add(new THREE.Vector3(0.2,0.2,0));P.group.add(s1);
+  }
+  const col=type==='bcc'?'#e8456a':'#1fb874';
+  document.getElementById('oct-pip-title').innerHTML=type==='bcc'
+    ?`<span style="color:${col}">BCC 찌그러진 팔면체 · r = 0.155R</span><span class="sub">빨간 선 a/2 × 2 · 회색 선 a/√2 × 4 · 점선 원 = C 원자 크기</span>`
+    :`<span style="color:${col}">FCC 정팔면체 · r = 0.414R</span><span class="sub">이웃 6개 모두 a/2 · 점선 원 = C 원자 크기</span>`;
+}
+function updateOctUI(){
+  const sec=document.getElementById('oct-section');
+  const supported=!!OCT_SITES[currentCrystal];
+  sec.style.display=supported?'':'none';
+  document.getElementById('oct-options').style.display=supported&&showOctSites?'':'none';
+  document.getElementById('oct-pip').style.display=supported&&showOctSites?'':'none';
+  resizeOctPip();
+  if(!supported) return;
+  const d=OCT_SITES[currentCrystal];
+  const bar=(ratio,col)=>`<div class="oct-bar"><span style="width:${ratio/0.414*100}%;background:${col}"></span></div>`;
+  document.getElementById('oct-info').innerHTML=currentCrystal==='bcc'
+    ?`<div><span class="oct-ratio" style="color:#e8456a">r = 0.155R</span> · 찌그러진 팔면체</div>${bar(0.155,'#ff5577')}
+      위치: 면 중심 (½,½,0), 모서리 중점 (½,0,0) — 단위셀당 6개<br>
+      이웃 6개 중 <strong>2개는 a/2</strong>(빨간 선), <strong>4개는 a/√2</strong>로 거리가 달라 정팔면체가 아닙니다. 가까운 2개가 간극을 제한해
+      r = (a/2 − R) = (2/√3 − 1)R ≈ <strong>0.155R</strong>.<br><br>
+      α-Fe에서 r ≈ 0.019 nm로 탄소(≈0.077 nm)보다 훨씬 작아 탄소 고용도가 <strong>최대 0.022 wt%</strong>에 불과합니다.
+      (참고: BCC 사면체 간극은 0.291R로 오히려 더 큽니다.)`
+    :`<div><span class="oct-ratio" style="color:#1fb874">r = 0.414R</span> · 정팔면체</div>${bar(0.414,'#44ee99')}
+      위치: 체심 (½,½,½), 모서리 중점 (½,0,0) — 단위셀당 4개<br>
+      이웃 6개(면심 원자)가 <strong>모두 a/2</strong>로 대칭입니다.
+      r = (a/2 − R) = (√2 − 1)R ≈ <strong>0.414R</strong>.<br><br>
+      γ-Fe에서 r ≈ 0.052 nm로 BCC보다 훨씬 커서 탄소 고용도가 <strong>최대 2.14 wt%</strong>입니다.
+      충전율은 FCC가 더 높지만 빈 공간이 적은 수의 큰 간극에 모여 있기 때문입니다.`;
+}
+function toggleOctSites(){
+  showOctSites=!showOctSites;
+  document.getElementById('toggleOct').classList.toggle('on',showOctSites);
+  updateOctUI();rebuildCrystal();
+}
+function toggleHardSphere(){
+  octHardSphere=!octHardSphere;
+  document.getElementById('toggleHard').classList.toggle('on',octHardSphere);
+  rebuildCrystal();
+}
+
+// ===== ANALYSIS (direction / plane) =====
+// ===== GRID POINTS =====
+function buildGridPoints(){
+  removeGridPoints();
+  const S=1.6, half=S/2;
+  const step=0.1;
+  const sharedGeo=new THREE.SphereGeometry(0.035,6,6);
+  const sharedMat=new THREE.MeshBasicMaterial({color:0x8899aa,transparent:true,opacity:0.18});
+  // Check if a grid point overlaps an atom
+  const atomFracs=crystalGroup.children.filter(c=>c.userData&&c.userData.isAtom).map(c=>c.userData.frac);
+  const isAtomAt=(fx,fy,fz)=>atomFracs.some(a=>Math.abs(a[0]-fx)<0.01&&Math.abs(a[1]-fy)<0.01&&Math.abs(a[2]-fz)<0.01);
+
+  if(currentCrystal==='hcp'){
+    // For HCP skip grid points (non-cubic coordinate system)
+    return;
+  }
+  for(let xi=0;xi<=10;xi++){
+    for(let yi=0;yi<=10;yi++){
+      for(let zi=0;zi<=10;zi++){
+        const fx=xi*step, fy=yi*step, fz=zi*step;
+        if(isAtomAt(fx,fy,fz)) continue;
+        const m=new THREE.Mesh(sharedGeo,sharedMat.clone());
+        m.position.set(fx*S-half, fy*S-half, fz*S-half);
+        m.userData={frac:[fx,fy,fz],isGridPt:true};
+        crystalGroup.add(m);
+        gridPointMeshes.push(m);
+      }
+    }
+  }
+}
+function removeGridPoints(){
+  gridPointMeshes.forEach(m=>{crystalGroup.remove(m);if(m.material)m.material.dispose()});
+  gridPointMeshes=[];
+}
+let lastHovered=null;
+function showHoverTooltip(e){
+  const rect=renderers.crystal.domElement.getBoundingClientRect();
+  mouse2.x=((e.clientX-rect.left)/rect.width)*2-1;
+  mouse2.y=-((e.clientY-rect.top)/rect.height)*2+1;
+  raycaster.setFromCamera(mouse2,cameras.crystal);
+  // Atoms first, then grid points
+  const selectable=crystalGroup.children.filter(c=>c.userData&&(c.userData.isAtom||c.userData.isGridPt));
+  const hits=raycaster.intersectObjects(selectable);
+  const tip=document.getElementById('coord-tooltip');
+  const container=document.getElementById('crystal-canvas');
+  // Unhover previous
+  if(lastHovered&&lastHovered.userData.isGridPt){
+    lastHovered.material.opacity=0.18;
+    lastHovered.scale.set(1,1,1);
+    lastHovered=null;
+  }
+  if(hits.length>0){
+    // Prefer atoms over grid points if both hit
+    let hit=hits[0].object;
+    const atomHit=hits.find(h=>h.object.userData.isAtom);
+    if(atomHit) hit=atomHit.object;
+    const f=hit.userData.frac;
+    const fmt=v=>{
+      const r=Math.round(v*10)/10;
+      if(Math.abs(r-Math.round(r))<0.01) return Math.round(r).toString();
+      // Nice fractions
+      if(Math.abs(r-0.5)<0.01) return'½';
+      if(Math.abs(r-0.1)<0.01) return'0.1';if(Math.abs(r-0.2)<0.01) return'0.2';
+      if(Math.abs(r-0.3)<0.01) return'0.3';if(Math.abs(r-0.4)<0.01) return'0.4';
+      if(Math.abs(r-0.6)<0.01) return'0.6';if(Math.abs(r-0.7)<0.01) return'0.7';
+      if(Math.abs(r-0.8)<0.01) return'0.8';if(Math.abs(r-0.9)<0.01) return'0.9';
+      return r.toFixed(1);
+    };
+    const label=hit.userData.isAtom?'원자':'격자점';
+    tip.textContent=`${label} (${f.map(fmt).join(', ')})`;
+    tip.style.display='block';
+    tip.style.left=(e.clientX-rect.left+14)+'px';
+    tip.style.top=(e.clientY-rect.top-10)+'px';
+    container.style.cursor='pointer';
+    // Hover highlight for grid points
+    if(hit.userData.isGridPt){
+      hit.material.opacity=0.7;
+      hit.scale.set(2.2,2.2,2.2);
+      lastHovered=hit;
+    }
+  } else {
+    tip.style.display='none';
+    container.style.cursor=mouseDown?'grabbing':'grab';
+  }
+}
+function handleAtomClick(e){
+  const rect=renderers.crystal.domElement.getBoundingClientRect();
+  mouse2.x=((e.clientX-rect.left)/rect.width)*2-1;
+  mouse2.y=-((e.clientY-rect.top)/rect.height)*2+1;
+  raycaster.setFromCamera(mouse2,cameras.crystal);
+  const selectable=crystalGroup.children.filter(c=>c.userData&&(c.userData.isAtom||c.userData.isGridPt));
+  const hits=raycaster.intersectObjects(selectable);
+  if(!hits.length) return;
+  // Prefer atoms over grid points
+  let hit=hits[0].object;
+  const atomHit=hits.find(h=>h.object.userData.isAtom);
+  if(atomHit&&atomHit.distance-hits[0].distance<0.3) hit=atomHit.object;
+  const frac=hit.userData.frac.slice();
+  const maxPts=analysisMode==='direction'?2:4;
+  if(selectedAtoms.length>=maxPts) return;
+  if(selectedAtoms.some(s=>s.frac[0]===frac[0]&&s.frac[1]===frac[1]&&s.frac[2]===frac[2])) return;
+  const hlC=ptColors[selectedAtoms.length%ptColors.length];
+  const hlR=hit.userData.isAtom?0.28:0.14;
+  const hl=new THREE.Mesh(new THREE.SphereGeometry(hlR,16,16),new THREE.MeshBasicMaterial({color:hlC,transparent:true,opacity:0.55,depthTest:false}));
+  hl.position.copy(hit.position);crystalGroup.add(hl);highlightMeshes.push(hl);
+  selectedAtoms.push({frac,mesh:hit,highlight:hl});
+  updateSelectionUI();
+  if(analysisMode==='direction'&&selectedAtoms.length===2){
+    computeDirection();
+  } else if(analysisMode==='plane'&&selectedAtoms.length>=3){
+    computePlane();
+  }
+}
+function updateSelectionUI(){
+  const el=document.getElementById('selected-pts');
+  if(!selectedAtoms.length){el.innerHTML='<span style="color:var(--text-dim)">원자 또는 격자점을 클릭하세요</span>';return;}
+  const labels=analysisMode==='direction'?['시작점','끝점']:['점 1','점 2','점 3','점 4'];
+  el.innerHTML=selectedAtoms.map((s,i)=>{
+    const c='#'+ptColors[i].toString(16).padStart(6,'0');
+    const fmt=v=>{if(Math.abs(v-.5)<.01)return'½';if(Math.abs(v)<.01)return'0';if(Math.abs(v-1)<.01)return'1';return v.toFixed(2);};
+    return `<span class="pt"><span class="dot" style="background:${c}"></span>${labels[i]}: (${s.frac.map(fmt).join(', ')})</span>`;
+  }).join(' ');
+}
+function gcd(a,b){a=Math.abs(a);b=Math.abs(b);while(b){[a,b]=[b,a%b]}return a}
+function lcm(a,b){return(a*b)/gcd(a,b)}
+function toSmallestIntegers(arr){
+  let mult=1;
+  arr.forEach(v=>{if(v!==0){for(let d=1;d<=12;d++){if(Math.abs(v*d-Math.round(v*d))<0.001){mult=lcm(mult,d);break}}}});
+  let ints=arr.map(v=>Math.round(v*mult));
+  let g=ints.reduce((a,b)=>gcd(a,Math.abs(b)),Math.abs(ints[0]));
+  if(g>0) ints=ints.map(v=>v/g);
+  return ints;
+}
+function computeDirection(){
+  const p1=selectedAtoms[0].frac, p2=selectedAtoms[1].frac;
+  const dir=[p2[0]-p1[0],p2[1]-p1[1],p2[2]-p1[2]];
+  const ints=toSmallestIntegers(dir);
+  const S=1.6,half=S/2;
+  const start=new THREE.Vector3(p1[0]*S-half,p1[1]*S-half,p1[2]*S-half);
+  const end=new THREE.Vector3(p2[0]*S-half,p2[1]*S-half,p2[2]*S-half);
+  const d=new THREE.Vector3().subVectors(end,start);
+  const len=d.length();
+  if(len>0.001){directionArrow=new THREE.ArrowHelper(d.normalize(),start,len,0xff4466,len*0.12,len*0.07);crystalGroup.add(directionArrow)}
+  const fmt=ints.map(v=>v<0?Math.abs(v)+'̄':v.toString());
+  document.getElementById('result-miller').textContent=`[${fmt.join(' ')}]`;
+  document.getElementById('result-miller').style.color='#ff4466';
+  const sorted=ints.map(Math.abs).sort((a,b)=>a-b);
+  document.getElementById('result-label').textContent=`결정방향 — ⟨${sorted.join(' ')}⟩ 계열`;
+  document.getElementById('result-box').style.display='flex';
+}
+function computePlane(){
+  // Remove previous plane visuals (for re-compute when adding 4th point)
+  if(planeVis){crystalGroup.remove(planeVis);planeVis=null}
+  const oldNormals=crystalGroup.children.filter(c=>c.userData&&c.userData._ph);
+  oldNormals.forEach(c=>{crystalGroup.remove(c);const idx=highlightMeshes.indexOf(c);if(idx>=0)highlightMeshes.splice(idx,1)});
+  // Edge lines from previous
+  const oldEdges=crystalGroup.children.filter(c=>c.userData&&c.userData._planeEdge);
+  oldEdges.forEach(c=>{crystalGroup.remove(c);const idx=highlightMeshes.indexOf(c);if(idx>=0)highlightMeshes.splice(idx,1)});
+
+  const pts=selectedAtoms.map(a=>a.frac);
+  const p1=pts[0],p2=pts[1],p3=pts[2];
+  const v1=[p2[0]-p1[0],p2[1]-p1[1],p2[2]-p1[2]];
+  const v2=[p3[0]-p1[0],p3[1]-p1[1],p3[2]-p1[2]];
+  let n=[v1[1]*v2[2]-v1[2]*v2[1],v1[2]*v2[0]-v1[0]*v2[2],v1[0]*v2[1]-v1[1]*v2[0]];
+  const mag=Math.sqrt(n[0]*n[0]+n[1]*n[1]+n[2]*n[2]);
+  if(mag<0.001){
+    document.getElementById('result-miller').textContent='—';
+    document.getElementById('result-label').textContent='세 점이 일직선입니다. 다른 점을 선택하세요.';
+    document.getElementById('result-box').style.display='flex';return;
+  }
+  const ints=toSmallestIntegers(n);
+  const S=1.6,half=S/2;
+  const toWorld=f=>new THREE.Vector3(f[0]*S-half,f[1]*S-half,f[2]*S-half);
+
+  // Build triangle or quadrilateral from actual points
+  const worldPts=pts.map(toWorld);
+  let geo;
+  if(pts.length===3){
+    // Triangle
+    geo=new THREE.BufferGeometry();
+    const verts=new Float32Array([
+      worldPts[0].x,worldPts[0].y,worldPts[0].z,
+      worldPts[1].x,worldPts[1].y,worldPts[1].z,
+      worldPts[2].x,worldPts[2].y,worldPts[2].z
+    ]);
+    geo.setAttribute('position',new THREE.BufferAttribute(verts,3));
+    geo.computeVertexNormals();
+  } else {
+    // Quadrilateral (4 points) — order them for proper face
+    // Sort by angle around centroid projected onto the plane
+    const normal3=new THREE.Vector3(n[0],n[1],n[2]).normalize();
+    const cx=(worldPts[0].x+worldPts[1].x+worldPts[2].x+worldPts[3].x)/4;
+    const cy=(worldPts[0].y+worldPts[1].y+worldPts[2].y+worldPts[3].y)/4;
+    const cz=(worldPts[0].z+worldPts[1].z+worldPts[2].z+worldPts[3].z)/4;
+    const center4=new THREE.Vector3(cx,cy,cz);
+    // Create local 2D basis on the plane
+    const u3=new THREE.Vector3().subVectors(worldPts[0],center4).normalize();
+    const v3=new THREE.Vector3().crossVectors(normal3,u3).normalize();
+    // Project and sort by angle
+    const indexed=worldPts.map((wp,i)=>{
+      const rel=new THREE.Vector3().subVectors(wp,center4);
+      const pu=rel.dot(u3), pv=rel.dot(v3);
+      return {idx:i,angle:Math.atan2(pv,pu)};
+    });
+    indexed.sort((a,b)=>a.angle-b.angle);
+    const sorted4=indexed.map(o=>worldPts[o.idx]);
+    // Two triangles: 0-1-2, 0-2-3
+    geo=new THREE.BufferGeometry();
+    const verts=new Float32Array([
+      sorted4[0].x,sorted4[0].y,sorted4[0].z,
+      sorted4[1].x,sorted4[1].y,sorted4[1].z,
+      sorted4[2].x,sorted4[2].y,sorted4[2].z,
+      sorted4[0].x,sorted4[0].y,sorted4[0].z,
+      sorted4[2].x,sorted4[2].y,sorted4[2].z,
+      sorted4[3].x,sorted4[3].y,sorted4[3].z
+    ]);
+    geo.setAttribute('position',new THREE.BufferAttribute(verts,3));
+    geo.computeVertexNormals();
+    // Replace worldPts order for edge drawing
+    worldPts.length=0;
+    sorted4.forEach(p=>worldPts.push(p));
+  }
+
+  planeVis=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({color:0x44ddff,transparent:true,opacity:0.28,side:THREE.DoubleSide,depthTest:false}));
+  crystalGroup.add(planeVis);
+
+  // Draw edges of the polygon
+  const edgePts=[...worldPts,worldPts[0]];
+  const edgeGeo=new THREE.BufferGeometry().setFromPoints(edgePts);
+  const edgeLine=new THREE.Line(edgeGeo,new THREE.LineBasicMaterial({color:0x44ddff,transparent:true,opacity:0.7}));
+  edgeLine.userData._planeEdge=true;
+  crystalGroup.add(edgeLine);highlightMeshes.push(edgeLine);
+
+  // Normal arrow from centroid
+  const centroid=new THREE.Vector3();
+  worldPts.forEach(p=>centroid.add(p));
+  centroid.divideScalar(worldPts.length);
+  const normal3=new THREE.Vector3(n[0],n[1],n[2]).normalize();
+  const nArr=new THREE.ArrowHelper(normal3,centroid,0.9,0x44ddff,0.09,0.055);
+  nArr.userData._ph=true;crystalGroup.add(nArr);highlightMeshes.push(nArr);
+
+  // Display result
+  const fmt=ints.map(v=>v<0?Math.abs(v)+'̄':v.toString());
+  document.getElementById('result-miller').textContent=`(${fmt.join(' ')})`;
+  document.getElementById('result-miller').style.color='#44ddff';
+  const sortedI=ints.map(Math.abs).sort((a,b)=>a-b);
+  let label=`결정면 — {${sortedI.join(' ')}} 계열`;
+  if(pts.length===3) label+=' · 4번째 점 추가 가능';
+  document.getElementById('result-label').textContent=label;
+  document.getElementById('result-box').style.display='flex';
+
+  // If 4th point: check coplanarity
+  if(pts.length===4){
+    const p4=pts[3];
+    const v3_check=[p4[0]-p1[0],p4[1]-p1[1],p4[2]-p1[2]];
+    const dot=n[0]*v3_check[0]+n[1]*v3_check[1]+n[2]*v3_check[2];
+    const coplanar=Math.abs(dot)<0.05;
+    if(!coplanar){
+      document.getElementById('result-label').textContent=label.replace(' · 4번째 점 추가 가능','')+' · ⚠ 4번째 점이 면에서 벗어남';
+    }
+  }
+}
+function setAnalysisMode(mode){
+  analysisMode=mode;clearSelection();
+  document.getElementById('btn-dir').className='mode-btn'+(mode==='direction'?' active':'');
+  document.getElementById('btn-plane').className='mode-btn'+(mode==='plane'?' active':'');
+  document.getElementById('btn-off').className='mode-btn'+(mode==='off'?' active':'');
+  const overlay=document.getElementById('click-overlay'),badge=document.getElementById('click-badge');
+  const guide=document.getElementById('analysis-guide'),ptsEl=document.getElementById('selected-pts'),clrBtn=document.getElementById('btn-clear');
+  if(mode==='off'){overlay.style.display='none';guide.style.display='none';ptsEl.style.display='none';clrBtn.style.display='none';document.getElementById('result-box').style.display='none';document.getElementById('coord-tooltip').style.display='none';removeGridPoints();return}
+  overlay.style.display='flex';guide.style.display='block';ptsEl.style.display='block';clrBtn.style.display='inline-block';
+  buildGridPoints();
+  if(mode==='direction'){
+    badge.textContent='결정방향 모드 — 점 2개 클릭';
+    guide.innerHTML='시작점과 끝점을 클릭 → [uvw] 계산. <strong>원자</strong>뿐 아니라 <strong>격자점</strong>(0.1 간격)도 선택 가능합니다.';
+  } else {
+    badge.textContent='결정면 모드 — 점 3~4개 클릭';
+    guide.innerHTML='점 <strong>3개</strong> → 삼각형 면 + (hkl). <strong>4번째 점</strong> → 사각형 면. 원자와 격자점(0.1 간격) 모두 선택 가능.';
+  }
+  if(currentCrystal==='hcp') guide.innerHTML+='<br><span style="color:var(--accent-hcp)">※ HCP는 Miller-Bravais (hkil), i=−(h+k) 변환 필요.</span>';
+}
+function clearSelection(){
+  selectedAtoms=[];
+  highlightMeshes.forEach(h=>{crystalGroup.remove(h);if(h.geometry)h.geometry.dispose()});
+  highlightMeshes=[];
+  if(directionArrow){crystalGroup.remove(directionArrow);directionArrow=null}
+  if(planeVis){crystalGroup.remove(planeVis);planeVis=null}
+  crystalGroup.children.filter(c=>c.userData&&(c.userData._ph||c.userData._planeEdge)).forEach(c=>crystalGroup.remove(c));
+  updateSelectionUI();document.getElementById('result-box').style.display='none';
+}
+
+// ===== MILLER INDEX INPUT VISUALIZATION =====
+let millerInputType='dir'; // 'dir' or 'plane'
+let millerVisMeshes=[];
+function setMillerInputType(type){
+  millerInputType=type;
+  document.getElementById('mi-type-dir').className='miller-type-btn'+(type==='dir'?' active':'');
+  document.getElementById('mi-type-plane').className='miller-type-btn'+(type==='plane'?' active type-plane':'');
+  document.getElementById('mi-bracket-l').textContent=type==='dir'?'[':'(';
+  document.getElementById('mi-bracket-r').textContent=type==='dir'?']':')';
+  if(type==='dir'){document.getElementById('mi-1').value=1;document.getElementById('mi-2').value=1;document.getElementById('mi-3').value=0}
+  else{document.getElementById('mi-1').value=1;document.getElementById('mi-2').value=1;document.getElementById('mi-3').value=1}
+}
+function clearMillerVis(){
+  millerVisMeshes.forEach(m=>{crystalGroup.remove(m);if(m.geometry)m.geometry.dispose()});
+  millerVisMeshes=[];
+}
+function showMillerInput(){
+  clearMillerVis();
+  const i1=parseInt(document.getElementById('mi-1').value)||0;
+  const i2=parseInt(document.getElementById('mi-2').value)||0;
+  const i3=parseInt(document.getElementById('mi-3').value)||0;
+  if(i1===0&&i2===0&&i3===0) return;
+  const S=1.6, half=S/2;
+  if(millerInputType==='dir'){
+    // Draw direction arrow [uvw] from origin through unit cell
+    const dir=new THREE.Vector3(i1,i2,i3).normalize();
+    const origin=new THREE.Vector3(-half,-half,-half);
+    // Find how far the arrow extends — scale to 1.6x unit cell
+    const maxComp=Math.max(Math.abs(i1),Math.abs(i2),Math.abs(i3));
+    const len=S*1.3*(Math.sqrt(i1*i1+i2*i2+i3*i3)/maxComp);
+    const arrow=new THREE.ArrowHelper(dir,origin,Math.min(len,S*2),0xff4466,0.12,0.07);
+    arrow.userData._millerVis=true;
+    crystalGroup.add(arrow);millerVisMeshes.push(arrow);
+    // Label
+    const lc=document.createElement('canvas');lc.width=96;lc.height=32;
+    const lx=lc.getContext('2d');lx.font='bold 18px JetBrains Mono,monospace';lx.fillStyle='#ff4466';
+    lx.textAlign='center';lx.textBaseline='middle';
+    const fmt=v=>v<0?Math.abs(v)+'̄':v.toString();
+    lx.fillText(`[${fmt(i1)} ${fmt(i2)} ${fmt(i3)}]`,48,16);
+    const lsp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(lc),transparent:true}));
+    lsp.scale.set(0.7,0.24,1);
+    const labelPos=origin.clone().add(dir.clone().multiplyScalar(Math.min(len,S*2)+0.25));
+    lsp.position.copy(labelPos);
+    lsp.userData._millerVis=true;
+    crystalGroup.add(lsp);millerVisMeshes.push(lsp);
+  } else {
+    // Draw plane (hkl) — find intersection with unit cube [0,1]³
+    const h=i1,k=i2,l=i3;
+    // Plane equation: h*x + k*y + l*z = n
+    // Choose n so the plane passes through the unit cell
+    // Try n=1 first; if no intersection, try other values
+    let bestN=1;
+    let bestPoly=getPlaneBoxIntersection(h,k,l,1);
+    if(bestPoly.length<3){
+      for(let n=-3;n<=3;n++){
+        if(n===0) continue;
+        const poly=getPlaneBoxIntersection(h,k,l,n);
+        if(poly.length>=3){bestPoly=poly;bestN=n;break}
+      }
+    }
+    if(bestPoly.length<3) return;
+    // Convert fractional to world coords
+    const worldPoly=bestPoly.map(p=>new THREE.Vector3(p[0]*S-half,p[1]*S-half,p[2]*S-half));
+    // Triangulate the polygon (fan from first vertex)
+    const positions=[];
+    for(let i=1;i<worldPoly.length-1;i++){
+      positions.push(worldPoly[0].x,worldPoly[0].y,worldPoly[0].z);
+      positions.push(worldPoly[i].x,worldPoly[i].y,worldPoly[i].z);
+      positions.push(worldPoly[i+1].x,worldPoly[i+1].y,worldPoly[i+1].z);
+    }
+    const geo=new THREE.BufferGeometry();
+    geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(positions),3));
+    geo.computeVertexNormals();
+    const mesh=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({color:0x44ddff,transparent:true,opacity:0.3,side:THREE.DoubleSide,depthTest:false}));
+    mesh.userData._millerVis=true;
+    crystalGroup.add(mesh);millerVisMeshes.push(mesh);
+    // Edge outline
+    const edgePts=[...worldPoly,worldPoly[0]];
+    const edgeLine=new THREE.Line(new THREE.BufferGeometry().setFromPoints(edgePts),
+      new THREE.LineBasicMaterial({color:0x44ddff,transparent:true,opacity:0.8}));
+    edgeLine.userData._millerVis=true;
+    crystalGroup.add(edgeLine);millerVisMeshes.push(edgeLine);
+    // Normal arrow
+    const centroid=new THREE.Vector3();
+    worldPoly.forEach(p=>centroid.add(p));centroid.divideScalar(worldPoly.length);
+    const normal=new THREE.Vector3(h,k,l).normalize();
+    const nArr=new THREE.ArrowHelper(normal,centroid,0.8,0x44ddff,0.08,0.05);
+    nArr.userData._millerVis=true;
+    crystalGroup.add(nArr);millerVisMeshes.push(nArr);
+    // Label
+    const lc=document.createElement('canvas');lc.width=96;lc.height=32;
+    const lx=lc.getContext('2d');lx.font='bold 18px JetBrains Mono,monospace';lx.fillStyle='#44ddff';
+    lx.textAlign='center';lx.textBaseline='middle';
+    const fmt=v=>v<0?Math.abs(v)+'̄':v.toString();
+    lx.fillText(`(${fmt(h)} ${fmt(k)} ${fmt(l)})`,48,16);
+    const lsp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(lc),transparent:true}));
+    lsp.scale.set(0.7,0.24,1);
+    lsp.position.copy(centroid.clone().add(normal.clone().multiplyScalar(0.95)));
+    lsp.userData._millerVis=true;
+    crystalGroup.add(lsp);millerVisMeshes.push(lsp);
+  }
+}
+function getPlaneBoxIntersection(h,k,l,n){
+  // Find intersection polygon of plane hx+ky+lz=n with unit cube [0,1]³
+  // Check all 12 edges of the cube
+  const corners=[[0,0,0],[1,0,0],[0,1,0],[0,0,1],[1,1,0],[1,0,1],[0,1,1],[1,1,1]];
+  const edges=[
+    [0,1],[0,2],[0,3],[1,4],[1,5],[2,4],[2,6],[3,5],[3,6],[4,7],[5,7],[6,7]
+  ];
+  const pts=[];
+  const eps=1e-9;
+  edges.forEach(([ai,bi])=>{
+    const a=corners[ai],b=corners[bi];
+    const va=h*a[0]+k*a[1]+l*a[2]-n;
+    const vb=h*b[0]+k*b[1]+l*b[2]-n;
+    if(Math.abs(va)<eps&&Math.abs(vb)<eps){
+      // Both on plane — add both
+      pts.push(a.slice(),b.slice());
+    } else if(va*vb<0){
+      // Intersection
+      const t=va/(va-vb);
+      pts.push([a[0]+t*(b[0]-a[0]),a[1]+t*(b[1]-a[1]),a[2]+t*(b[2]-a[2])]);
+    } else if(Math.abs(va)<eps){
+      pts.push(a.slice());
+    } else if(Math.abs(vb)<eps){
+      pts.push(b.slice());
+    }
+  });
+  // Remove duplicates
+  const unique=[];
+  pts.forEach(p=>{
+    if(!unique.some(u=>Math.abs(u[0]-p[0])<eps&&Math.abs(u[1]-p[1])<eps&&Math.abs(u[2]-p[2])<eps))
+      unique.push(p);
+  });
+  if(unique.length<3) return unique;
+  // Sort polygon vertices by angle around centroid
+  const cx=unique.reduce((s,p)=>s+p[0],0)/unique.length;
+  const cy=unique.reduce((s,p)=>s+p[1],0)/unique.length;
+  const cz=unique.reduce((s,p)=>s+p[2],0)/unique.length;
+  const normal=new THREE.Vector3(h,k,l).normalize();
+  // Local basis on the plane
+  let u3=new THREE.Vector3(unique[0][0]-cx,unique[0][1]-cy,unique[0][2]-cz);
+  if(u3.length()<eps) u3=new THREE.Vector3(unique[1][0]-cx,unique[1][1]-cy,unique[1][2]-cz);
+  u3.normalize();
+  const v3=new THREE.Vector3().crossVectors(normal,u3).normalize();
+  unique.sort((a,b)=>{
+    const aa=Math.atan2((a[0]-cx)*v3.x+(a[1]-cy)*v3.y+(a[2]-cz)*v3.z,
+                        (a[0]-cx)*u3.x+(a[1]-cy)*u3.y+(a[2]-cz)*u3.z);
+    const bb=Math.atan2((b[0]-cx)*v3.x+(b[1]-cy)*v3.y+(b[2]-cz)*v3.z,
+                        (b[0]-cx)*u3.x+(b[1]-cy)*u3.y+(b[2]-cz)*u3.z);
+    return aa-bb;
+  });
+  return unique;
+}
+
+// ===== DISLOCATION =====
+function buildEdge(group){
+  const sp=0.52,rows=9,cols=11,hr=4,hc=5;
+  for(let row=0;row<rows;row++){
+    const isUp=row>hr;
+    for(let col=0;col<cols;col++){
+      let x=(col-hc)*sp, y=(row-hr)*sp;
+      const dist=Math.sqrt(x*x+y*y);
+      if(dist>0.05&&dist<4){const a2=Math.atan2(y,x);const d2=0.06/(dist*0.7+0.3);x+=d2*Math.cos(a2)*(isUp?0.5:-0.5)}
+      let color=0x6688aa,r=0.11;
+      if(row>hr&&col===hc){color=0xf06070;r=0.13}
+      if(row===hr&&(col===hc||col===hc-1)){color=0xff9090;r=0.12}
+      const s=makeSphere(r,color);s.position.set(x,y,0);group.add(s);
+    }
+  }
+  group.add(new THREE.ArrowHelper(new THREE.Vector3(1,0,0),new THREE.Vector3(-sp*2,-sp*5.2,0),sp*1.8,0xff3333,0.14,0.09));
+  // ⊥ label
+  const tc=document.createElement('canvas');tc.width=64;tc.height=64;const tx=tc.getContext('2d');
+  tx.fillStyle='#f06070';tx.font='bold 50px serif';tx.textAlign='center';tx.textBaseline='middle';tx.fillText('⊥',32,34);
+  const tSp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(tc),transparent:true}));
+  tSp.scale.set(0.4,0.4,1);tSp.position.set(0,0.2,0);group.add(tSp);
+  // b label
+  const bc=document.createElement('canvas');bc.width=48;bc.height=48;const bx=bc.getContext('2d');
+  bx.fillStyle='#ff3333';bx.font='bold italic 38px serif';bx.textAlign='center';bx.textBaseline='middle';bx.fillText('b',24,24);
+  const bSp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(bc),transparent:true}));
+  bSp.scale.set(0.3,0.3,1);bSp.position.set(-sp*1.1,-sp*5.8,0);group.add(bSp);
+}
+function buildScrew(group){
+  const sp=0.52,layers=7,size=4;
+  for(let layer=0;layer<layers;layer++){const z=(layer-3)*sp;
+    for(let row=-size;row<=size;row++){for(let col=-size;col<=size;col++){
+      let x=col*sp*0.5,y=row*sp*0.5;
+      const dist=Math.sqrt(x*x+y*y);let zOff=0;
+      if(dist>0.01) zOff=(sp/(2*Math.PI))*Math.atan2(y,x);
+      let color=0x6688aa,r=0.08;if(dist<0.15){color=0xb07af5;r=0.1}
+      const s=makeSphere(r,color);s.position.set(x,y,z+zOff);group.add(s);
+    }}
+  }
+  group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,-sp*4),new THREE.Vector3(0,0,sp*4)]),new THREE.LineBasicMaterial({color:0xb07af5})));
+  group.add(new THREE.ArrowHelper(new THREE.Vector3(0,0,1),new THREE.Vector3(sp*3,sp*2,-sp*2),sp*2,0xff3333,0.14,0.09));
+}
+
+// ===== SLIP =====
+function buildSlipVis(group,type){
+  buildCrystal(group,type);
+  const S=1.6,half=S/2;
+  if(type==='bcc'){
+    const p=new THREE.Mesh(new THREE.PlaneGeometry(2.4,2.4),new THREE.MeshBasicMaterial({color:0xf59e42,transparent:true,opacity:0.18,side:THREE.DoubleSide}));
+    p.rotation.y=Math.PI/4;group.add(p);
+    group.add(new THREE.ArrowHelper(new THREE.Vector3(1,1,1).normalize(),new THREE.Vector3(-half,-half,-half),S*1.1,0xffcc00,0.12,0.07));
+  } else if(type==='fcc'){
+    const p=new THREE.Mesh(new THREE.PlaneGeometry(2.4,2.4),new THREE.MeshBasicMaterial({color:0x5ba4f5,transparent:true,opacity:0.18,side:THREE.DoubleSide}));
+    p.lookAt(new THREE.Vector3(1,1,1).normalize());group.add(p);
+    group.add(new THREE.ArrowHelper(new THREE.Vector3(1,1,0).normalize(),new THREE.Vector3(-half*0.6,-half*0.6,0),S*0.8,0xffcc00,0.12,0.07));
+  } else {
+    const pts=[];for(let i=0;i<6;i++)pts.push(new THREE.Vector2(Math.cos((Math.PI/3)*i),Math.sin((Math.PI/3)*i)));
+    const p=new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape(pts)),new THREE.MeshBasicMaterial({color:0x6dd4a0,transparent:true,opacity:0.22,side:THREE.DoubleSide}));
+    p.rotation.x=-Math.PI/2;p.position.y=-1.633/2;group.add(p);
+  }
+}
+
+// ===== CLOSE-PACKED STACKING =====
+const LAYER_COLORS = { A:0x5ba4f5, B:0xf59e42, C:0xe05080 };
+function makePackedSphere(r, color, opacity){
+  return new THREE.Mesh(
+    new THREE.SphereGeometry(r,20,20),
+    new THREE.MeshPhongMaterial({color,transparent:true,opacity:opacity||0.92,shininess:60})
+  );
+}
+function buildHexLayer(group, cx, cy, cz, r, color, rows, opacity){
+  // Build a circular hex layer of touching spheres in the xy-plane at height z
+  const d=2*r;
+  const atoms=[];
+  for(let row=-rows;row<=rows;row++){
+    for(let col=-rows;col<=rows;col++){
+      const x = cx + col*d + (Math.abs(row)%2===1 ? r : 0);
+      const y = cy + row*d*Math.sqrt(3)/2;
+      const dist=Math.sqrt((x-cx)*(x-cx)+(y-cy)*(y-cy));
+      if(dist > rows*d*0.72) continue; // circular clip
+      const sp=makePackedSphere(r*0.98,color,opacity);
+      sp.position.set(x,y,cz);
+      group.add(sp);
+      atoms.push(sp);
+    }
+  }
+  return atoms;
+}
+function getStackingSequence(type, count){
+  if(type==='fcc'){
+    const seq=['A','B','C'];
+    return Array.from({length:count},(_,i)=>seq[i%3]);
+  } else {
+    const seq=['A','B'];
+    return Array.from({length:count},(_,i)=>seq[i%2]);
+  }
+}
+function getLayerOffset(layerType, r){
+  const d=2*r;
+  // A: no offset, B: one hollow, C: other hollow
+  if(layerType==='A') return {x:0,y:0};
+  if(layerType==='B') return {x:r, y:r*Math.sqrt(3)/3};
+  // C
+  return {x:0, y:2*r*Math.sqrt(3)/3};
+}
+function buildStacking(group){
+  const r=0.38;
+  const d=2*r;
+  const layerH = d*Math.sqrt(2/3); // close-packed layer height
+  const spread = stackSpread ? layerH*1.8 : layerH;
+  const seq=getStackingSequence(currentStacking, stackLayerCount);
+  const totalH = (seq.length-1)*spread;
+  const rows=3; // hex layers radius
+
+  for(let i=0;i<seq.length;i++){
+    const lt=seq[i];
+    const off=getLayerOffset(lt, r);
+    const z = i*spread - totalH/2;
+    const opacity = 0.92;
+    buildHexLayer(group, off.x, off.y, z, r, LAYER_COLORS[lt], rows, opacity);
+
+    // Layer label sprite
+    const c=document.createElement('canvas');c.width=48;c.height=48;
+    const ctx=c.getContext('2d');
+    ctx.font='bold 34px JetBrains Mono,monospace';
+    ctx.fillStyle='#'+LAYER_COLORS[lt].toString(16).padStart(6,'0');
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(lt,24,24);
+    const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true}));
+    sp.scale.set(0.35,0.35,1);
+    sp.position.set(rows*d*0.82, 0, z);
+    group.add(sp);
+  }
+
+  // z-axis (stacking direction) arrow
+  const arrowLen=totalH*0.7;
+  const arrow=new THREE.ArrowHelper(new THREE.Vector3(0,0,1),
+    new THREE.Vector3(-rows*d*0.85,0,-totalH/2-0.3),arrowLen+0.6,0x88aacc,0.12,0.07);
+  group.add(arrow);
+  // "적층 방향" label
+  const lc=document.createElement('canvas');lc.width=120;lc.height=32;
+  const lx=lc.getContext('2d');
+  lx.font='500 16px IBM Plex Sans KR,sans-serif';lx.fillStyle='#88aacc';
+  lx.textAlign='center';lx.textBaseline='middle';lx.fillText('적층 방향',60,16);
+  const lsp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(lc),transparent:true}));
+  lsp.scale.set(0.8,0.22,1);
+  lsp.position.set(-rows*d*0.85, 0, totalH/2+0.6);
+  group.add(lsp);
+
+  updateStackingUI(seq);
+}
+function updateStackingUI(seq){
+  // Stacking sequence chips
+  const el=document.getElementById('stacking-seq');
+  el.innerHTML=seq.map((lt,i)=>{
+    const cls=lt==='A'?'a-layer':lt==='B'?'b-layer':'c-layer';
+    return `<div class="seq-chip ${cls}">${lt}</div>`;
+  }).join('→ '.split('').map(c=>`<span style="color:var(--text-dim);font-size:0.8rem;display:flex;align-items:center">${c}</span>`).join(''));
+  // Simpler approach
+  el.innerHTML='';
+  seq.forEach((lt,i)=>{
+    if(i>0){const arrow=document.createElement('span');arrow.textContent='→';arrow.style.cssText='color:var(--text-dim);font-size:0.8rem;display:flex;align-items:center';el.appendChild(arrow)}
+    const chip=document.createElement('div');
+    chip.className=`seq-chip ${lt==='A'?'a-layer':lt==='B'?'b-layer':'c-layer'}`;
+    chip.textContent=lt;el.appendChild(chip);
+  });
+  document.getElementById('layer-counter').textContent=`${stackLayerCount} 층`;
+}
+function switchStacking(type,btn){
+  currentStacking=type;
+  document.querySelectorAll('#stack-sub-tabs .sub-tab').forEach(t=>t.className='sub-tab');
+  if(btn) btn.className='sub-tab active-'+(type==='fcc'?'fcc':'hcp');
+  document.getElementById('stack-title').textContent=type==='fcc'?'FCC 적층 — ABCABC...':'HCP 적층 — ABABAB...';
+  document.getElementById('stack-desc').innerHTML=type==='fcc'
+    ?'FCC는 조밀충전면 {111}을 <strong>A→B→C→A→B→C</strong> 순서로 적층합니다. 세 번째 층(C)이 첫 번째 층(A)과 다른 위치에 놓여 <strong>3층 주기</strong>를 가집니다.'
+    :'HCP는 조밀충전면 (0001)을 <strong>A→B→A→B</strong> 순서로 적층합니다. 세 번째 층이 첫 번째 층(A)과 같은 위치로 돌아와 <strong>2층 주기</strong>를 가집니다.';
+  rebuildStack();
+}
+function changeLayerCount(delta){
+  stackLayerCount=Math.max(2,Math.min(8,stackLayerCount+delta));
+  document.getElementById('btnLayerMinus').disabled=(stackLayerCount<=2);
+  document.getElementById('btnLayerPlus').disabled=(stackLayerCount>=8);
+  rebuildStack();
+}
+function toggleSpread(){
+  stackSpread=!stackSpread;
+  document.getElementById('toggleSpread').classList.toggle('on');
+  rebuildStack();
+}
+function rebuildStack(){
+  clearGroup(stackGroup);
+  buildStacking(stackGroup);
+  rebuildPip();
+}
+
+// ===== PIP (Unit Cell Inset) =====
+function initPip(){
+  const container=document.getElementById('pip-canvas');
+  const w=container.clientWidth||180, h=container.clientHeight||180;
+  pipScene=new THREE.Scene();
+  pipCamera=new THREE.PerspectiveCamera(38,w/h,0.1,50);
+  updateCameraFromSpherical(pipCamera,pipCamState);
+  pipRenderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+  pipRenderer.setSize(w,h);
+  pipRenderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  container.insertBefore(pipRenderer.domElement,container.firstChild);
+  pipScene.add(new THREE.AmbientLight(0xffffff,0.5));
+  const d1=new THREE.DirectionalLight(0xffffff,0.8);d1.position.set(4,4,5);pipScene.add(d1);
+  const d2=new THREE.DirectionalLight(0xffffff,0.3);d2.position.set(-3,-2,-3);pipScene.add(d2);
+  pipGroup=new THREE.Group();pipScene.add(pipGroup);
+
+  // PIP orbit controls
+  const cvs=pipRenderer.domElement;
+  cvs.addEventListener('pointerdown',e=>{pipMouseDown=true;pipLastMouse={x:e.clientX,y:e.clientY};cvs.setPointerCapture(e.pointerId);e.stopPropagation()});
+  cvs.addEventListener('pointerup',e=>{pipMouseDown=false;cvs.releasePointerCapture(e.pointerId);e.stopPropagation()});
+  cvs.addEventListener('pointermove',e=>{
+    if(!pipMouseDown)return;e.stopPropagation();
+    const dx=e.clientX-pipLastMouse.x,dy=e.clientY-pipLastMouse.y;
+    pipCamState.phi-=dx*0.008;
+    pipCamState.theta=Math.max(0.05,Math.min(Math.PI-0.05,pipCamState.theta-dy*0.008));
+    pipLastMouse={x:e.clientX,y:e.clientY};
+  });
+  cvs.addEventListener('wheel',e=>{
+    e.preventDefault();e.stopPropagation();
+    pipCamState.radius=Math.max(3,Math.min(10,pipCamState.radius+e.deltaY*0.005));
+  },{passive:false});
+}
+function buildPipFCC(group){
+  const S=1.5, half=S/2;
+  // FCC atoms with layer coloring by (111) plane: sum = x+y+z
+  const allAtoms=[
+    // corners
+    [0,0,0],[1,0,0],[0,1,0],[0,0,1],[1,1,0],[1,0,1],[0,1,1],[1,1,1],
+    // face centers
+    [.5,.5,0],[.5,0,.5],[0,.5,.5],[1,.5,.5],[.5,1,.5],[.5,.5,1]
+  ];
+  allAtoms.forEach(f=>{
+    const sum=f[0]+f[1]+f[2];
+    let layer, color;
+    if(Math.abs(sum)<0.01||Math.abs(sum-3)<0.01){layer='A';color=LAYER_COLORS.A;}
+    else if(Math.abs(sum-1)<0.01){layer='B';color=LAYER_COLORS.B;}
+    else{layer='C';color=LAYER_COLORS.C;}
+    const sp=makeSphere(0.16,color);
+    sp.position.set(f[0]*S-half,f[1]*S-half,f[2]*S-half);
+    group.add(sp);
+  });
+  // Wire box
+  group.add(new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.BoxGeometry(S,S,S)),
+    new THREE.LineBasicMaterial({color:0x5ba4f5,transparent:true,opacity:0.3})
+  ));
+  // [111] direction arrow (stacking direction)
+  const dir111=new THREE.Vector3(1,1,1).normalize();
+  group.add(new THREE.ArrowHelper(dir111,
+    new THREE.Vector3(-half,-half,-half),S*1.5,0x88aacc,0.1,0.06));
+  // (111) plane — transparent
+  const pg=new THREE.Mesh(new THREE.PlaneGeometry(S*1.6,S*1.6),
+    new THREE.MeshBasicMaterial({color:0x88bbee,transparent:true,opacity:0.12,side:THREE.DoubleSide}));
+  pg.lookAt(dir111);
+  group.add(pg);
+  // [111] label
+  const lc=document.createElement('canvas');lc.width=80;lc.height=28;
+  const lx=lc.getContext('2d');lx.font='bold 16px JetBrains Mono,monospace';lx.fillStyle='#88aacc';
+  lx.textAlign='center';lx.textBaseline='middle';lx.fillText('[111]',40,14);
+  const lsp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(lc),transparent:true}));
+  lsp.scale.set(0.55,0.2,1);
+  lsp.position.copy(new THREE.Vector3(-half,-half,-half).add(dir111.clone().multiplyScalar(S*1.65)));
+  group.add(lsp);
+}
+function buildPipHCP(group){
+  const a=0.85, cH=1.633*a, r=0.14;
+  // Bottom hex (A layer)
+  for(let i=0;i<6;i++){
+    const ang=(Math.PI/3)*i;
+    const sp=makeSphere(r,LAYER_COLORS.A);
+    sp.position.set(a*Math.cos(ang),a*Math.sin(ang),-cH/2);
+    group.add(sp);
+  }
+  const bc=makeSphere(r,LAYER_COLORS.A);bc.position.set(0,0,-cH/2);group.add(bc);
+  // Top hex (A layer)
+  for(let i=0;i<6;i++){
+    const ang=(Math.PI/3)*i;
+    const sp=makeSphere(r,LAYER_COLORS.A);
+    sp.position.set(a*Math.cos(ang),a*Math.sin(ang),cH/2);
+    group.add(sp);
+  }
+  const tc=makeSphere(r,LAYER_COLORS.A);tc.position.set(0,0,cH/2);group.add(tc);
+  // Mid layer (B layer)
+  for(let i=0;i<3;i++){
+    const ang=(Math.PI/3)*(2*i+1);
+    const sp=makeSphere(r*1.05,LAYER_COLORS.B);
+    sp.position.set(a*0.577*Math.cos(ang),a*0.577*Math.sin(ang),0);
+    group.add(sp);
+  }
+  // Hex outline
+  const drawHex=(z,op)=>{
+    const pts=[];for(let i=0;i<=6;i++)pts.push(new THREE.Vector3(a*Math.cos((Math.PI/3)*i),a*Math.sin((Math.PI/3)*i),z));
+    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),
+      new THREE.LineBasicMaterial({color:0x6dd4a0,transparent:true,opacity:op||0.3})));
+  };
+  drawHex(-cH/2);drawHex(cH/2);
+  for(let i=0;i<6;i++){
+    const ang=(Math.PI/3)*i;
+    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(a*Math.cos(ang),a*Math.sin(ang),-cH/2),
+      new THREE.Vector3(a*Math.cos(ang),a*Math.sin(ang),cH/2)
+    ]),new THREE.LineBasicMaterial({color:0x6dd4a0,transparent:true,opacity:0.2})));
+  }
+  // c-axis arrow
+  group.add(new THREE.ArrowHelper(new THREE.Vector3(0,0,1),
+    new THREE.Vector3(-a*1.3,0,-cH/2-0.15),cH+0.4,0x88aacc,0.08,0.05));
+  const lc=document.createElement('canvas');lc.width=40;lc.height=24;
+  const lx=lc.getContext('2d');lx.font='bold 16px JetBrains Mono,monospace';lx.fillStyle='#88aacc';
+  lx.textAlign='center';lx.textBaseline='middle';lx.fillText('c',20,12);
+  const lsp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(lc),transparent:true}));
+  lsp.scale.set(0.25,0.16,1);lsp.position.set(-a*1.3,0,cH/2+0.35);
+  group.add(lsp);
+  // Basal plane highlight
+  const bpts=[];for(let i=0;i<6;i++)bpts.push(new THREE.Vector2(a*1.1*Math.cos((Math.PI/3)*i),a*1.1*Math.sin((Math.PI/3)*i)));
+  const bp=new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape(bpts)),
+    new THREE.MeshBasicMaterial({color:0x6dd4a0,transparent:true,opacity:0.1,side:THREE.DoubleSide}));
+  bp.position.z=-cH/2;group.add(bp);
+}
+function rebuildPip(){
+  if(!pipGroup)return;
+  clearGroup(pipGroup);
+  if(currentStacking==='fcc') buildPipFCC(pipGroup);
+  else buildPipHCP(pipGroup);
+  document.getElementById('pip-label').textContent=currentStacking==='fcc'?'FCC 단위격자 · [111] 적층':'HCP 단위격자 · c축 적층';
+}
+
+// ===== UI =====
+function switchMain(tab){
+  document.querySelectorAll('.main-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-'+tab).classList.add('active');
+  setTimeout(handleResize,50);
+}
+function switchCrystal(type,btn){
+  currentCrystal=type;removeGridPoints();clearMillerVis();setAnalysisMode('off');
+  const d=crystalData[type];
+  document.querySelectorAll('#crystal-sub-tabs .sub-tab').forEach(t=>t.className='sub-tab');
+  if(btn)btn.className='sub-tab active-'+type;
+  document.getElementById('crystal-title').textContent=d.title;
+  document.getElementById('crystal-props').innerHTML=d.props.map(([l,v])=>`<div class="prop-row"><span class="prop-label">${l}</span><span class="prop-value">${v}</span></div>`).join('');
+  document.getElementById('crystal-desc').innerHTML=d.desc;
+  document.getElementById('crystal-examples').innerHTML=d.examples.map(e=>`<div class="example-chip">${e}</div>`).join('');
+  updateOctUI();
+  rebuildCrystal();
+}
+function switchDisloc(type,btn){
+  currentDisloc=type;dislocPhase=0;dislocAnimating=false;
+  document.getElementById('btnAnimate').classList.remove('playing');
+  document.getElementById('btnAnimate').textContent='▶ 전위 이동 재생';
+  const d=dislocData[type];
+  document.querySelectorAll('#disloc-info .sub-tab').forEach(t=>t.className='sub-tab');
+  if(btn)btn.className='sub-tab active-'+type;
+  document.getElementById('disloc-title').textContent=d.title;
+  document.getElementById('disloc-props').innerHTML=d.props.map(([l,v])=>`<div class="prop-row"><span class="prop-label">${l}</span><span class="prop-value">${v}</span></div>`).join('');
+  document.getElementById('disloc-desc').innerHTML=d.desc;rebuildDisloc();
+}
+function switchSlip(type,btn){
+  currentSlip=type;const d=slipData[type];
+  document.querySelectorAll('#slip-info .sub-tab').forEach(t=>t.className='sub-tab');
+  if(btn)btn.className='sub-tab active-'+type;
+  document.getElementById('slip-title').textContent=d.title;
+  document.getElementById('slip-content').innerHTML=d.content;rebuildSlip();
+}
+function toggleCellOutline(){showCellOutline=!showCellOutline;document.getElementById('toggleCell').classList.toggle('on');rebuildCrystal()}
+function toggleAxes(){showAxes=!showAxes;document.getElementById('toggleAxes').classList.toggle('on');rebuildCrystal()}
+function toggleDislocAnim(){dislocAnimating=!dislocAnimating;const b=document.getElementById('btnAnimate');b.classList.toggle('playing');b.textContent=dislocAnimating?'⏸ 일시정지':'▶ 전위 이동 재생'}
+function resetDislocAnim(){dislocPhase=0;dislocAnimating=false;document.getElementById('btnAnimate').classList.remove('playing');document.getElementById('btnAnimate').textContent='▶ 전위 이동 재생';rebuildDisloc()}
+function calcSchmid(){const phi=parseFloat(document.getElementById('phi').value)||0;const lam=parseFloat(document.getElementById('lambda').value)||0;const m=Math.cos(phi*Math.PI/180)*Math.cos(lam*Math.PI/180);document.getElementById('schmid-result').textContent=`m = ${m.toFixed(3)}`}
+
+// ===== BUILD =====
+function clearGroup(g){if(!g)return;while(g.children.length){const c=g.children[0];if(c.geometry)c.geometry.dispose();if(c.material){if(c.material.map)c.material.map.dispose();c.material.dispose()}g.remove(c)}}
+function rebuildCrystal(){clearGroup(crystalGroup);buildCrystal(crystalGroup,currentCrystal);highlightMeshes.forEach(h=>crystalGroup.add(h));if(directionArrow)crystalGroup.add(directionArrow);if(planeVis)crystalGroup.add(planeVis)}
+function rebuildDisloc(){clearGroup(dislocGroup);if(currentDisloc==='edge')buildEdge(dislocGroup);else buildScrew(dislocGroup)}
+function rebuildSlip(){clearGroup(slipGroup);buildSlipVis(slipGroup,currentSlip)}
+
+// ===== Fe-C 상태도 =====
+// 준안정 Fe–Fe₃C 상태도. 특성점 표기는 관용 기호(A,B,C,…,S)를 따름. 좌표: [C wt%, T °C]
+const FEC={W:720,H:640,ML:58,MR:104,MT:24,MB:46};
+FEC.PW=FEC.W-FEC.ML-FEC.MR; FEC.PH=FEC.H-FEC.MT-FEC.MB;
+const FEC_ZOOMS={full:{xMax:6.67,step:1},steel:{xMax:2.2,step:0.2},low:{xMax:0.25,step:0.05}};
+let fecZoom='full', fecSel=null, fecHoverId=null;
+const FP={A:[0,1538],B:[0.53,1495],C:[4.30,1147],D:[6.67,1227],E:[2.14,1147],F:[6.67,1147],G:[0,912],
+  H:[0.09,1495],J:[0.17,1495],K:[6.67,727],N:[0,1394],P:[0.022,727],S:[0.76,727]};
+const FCURVE={
+  liqAB:[FP.A,FP.B],
+  liqBC:[FP.B,[1.0,1465],[2.0,1393],[3.0,1300],[3.7,1220],FP.C],
+  liqCD:[FP.C,[5.0,1180],[6.0,1215],FP.D],
+  solAH:[FP.A,FP.H],
+  solJE:[FP.J,[0.5,1460],[1.0,1405],[1.5,1325],[1.9,1235],FP.E],
+  HN:[FP.H,FP.N], JN:[FP.J,FP.N],
+  acm:[FP.E,[2.0,1110],[1.6,1000],[1.4,950],[1.2,880],[1.0,805],FP.S],
+  a3:[FP.G,[0.2,850],[0.4,795],[0.6,755],FP.S],
+  gp:[FP.G,[0.006,860],[0.014,790],FP.P],
+  solv:[FP.P,[0.015,650],[0.008,500],[0.003,300],[0.0005,0]],
+  peri:[FP.H,FP.B], eut:[FP.E,FP.F], eutd:[FP.P,FP.K], cem:[[6.67,0],FP.D]
+};
+const frev=a=>a.slice().reverse();
+const FPC={'α':'#f59e42','γ':'#5ba4f5','δ':'#f5d042','L':'#f06070','Fe₃C':'#9aa0ae'};
+// phases: 2상 영역은 [저탄소 쪽, 고탄소 쪽] 순서 — 지렛대 규칙의 왼쪽/오른쪽 끝
+const FREG=[
+  {id:'L',name:'L',phases:['L'],poly:[[0,1600],[6.67,1600],...frev(FCURVE.liqCD),...frev(FCURVE.liqBC).slice(1),FP.A]},
+  {id:'delta',name:'δ',phases:['δ'],poly:[FP.A,FP.H,FP.N]},
+  {id:'Ld',name:'L + δ',phases:['δ','L'],poly:[FP.A,FP.B,FP.H]},
+  {id:'dg',name:'δ + γ',phases:['δ','γ'],poly:[FP.H,FP.J,FP.N]},
+  {id:'Lg',name:'L + γ',phases:['γ','L'],poly:[FP.J,...FCURVE.liqBC,FP.E,...frev(FCURVE.solJE).slice(1,-1)]},
+  {id:'gamma',name:'γ',phases:['γ'],poly:[FP.N,FP.J,...FCURVE.solJE.slice(1),...FCURVE.acm.slice(1),...frev(FCURVE.a3).slice(1)]},
+  {id:'LC',name:'L + Fe₃C',phases:['L','Fe₃C'],poly:[FP.C,...FCURVE.liqCD.slice(1),FP.F]},
+  {id:'gC',name:'γ + Fe₃C',phases:['γ','Fe₃C'],poly:[FP.E,FP.F,FP.K,FP.S,...frev(FCURVE.acm).slice(1,-1)]},
+  {id:'ag',name:'α + γ',phases:['α','γ'],poly:[FP.G,...FCURVE.a3.slice(1),...frev(FCURVE.gp).slice(0,-1)]},
+  {id:'alpha',name:'α',phases:['α'],poly:[[0,0],...frev(FCURVE.solv),...frev(FCURVE.gp).slice(1)]},
+  {id:'aC',name:'α + Fe₃C',phases:['α','Fe₃C'],poly:[...FCURVE.solv,[6.67,0],FP.K]}
+];
+const FREG_BY=Object.fromEntries(FREG.map(r=>[r.id,r]));
+// 라벨 위치 (줌별). lead가 있으면 지시선으로 연결
+const FLABELS=[
+  {t:'L (액상)',c:'L',at:{full:[3.2,1480],steel:[1.1,1555],low:[0.16,1570]}},
+  {t:'γ',s:'오스테나이트',c:'γ',big:1,at:{full:[0.85,1040],steel:[0.9,1060],low:[0.13,1150]}},
+  {t:'L + γ',at:{full:[2.55,1265],steel:[1.35,1400]}},
+  {t:'L + Fe₃C',sm:1,at:{full:[5.85,1168]}},
+  {t:'γ + Fe₃C',at:{full:[4.2,950],steel:[1.85,850]}},
+  {t:'α + Fe₃C',at:{full:[3.6,380],steel:[1.2,380],low:[0.14,380]}},
+  {t:'α + γ',sm:1,at:{full:[0.27,772],steel:[0.3,772],low:[0.13,820]}},
+  {t:'α',s:'페라이트',c:'α',big:1,at:{full:[0.55,560],steel:[0.38,560],low:[0.008,690]},lead:{full:[0.004,470],steel:[0.006,470]}},
+  {t:'δ',c:'δ',big:1,at:{full:[0.6,1560],steel:[0.42,1560],low:[0.022,1452]},lead:{full:[0.02,1470],steel:[0.025,1470]}},
+  {t:'L + δ',sm:1,at:{low:[0.2,1512]}},
+  {t:'δ + γ',sm:1,at:{low:[0.088,1466]}},
+  {t:'Fe₃C',s:'시멘타이트',c:'Fe₃C',rot:1,at:{full:[6.67,420]}},
+  {t:'액상선',dim:1,at:{full:[2.75,1352],steel:[1.75,1445]}},
+  {t:'고상선',dim:1,at:{full:[1.15,1345],steel:[1.15,1345]}},
+  {t:'Acm',dim:1,at:{full:[1.62,958],steel:[1.62,958]}},
+  {t:'A₃',dim:1,at:{full:[0.47,818],steel:[0.47,818],low:[0.22,880]}},
+  {t:'α 솔버스',dim:1,at:{low:[0.04,560]}}
+];
+const FGUIDE_T=[[1538,'1538°C 순철 융점'],[1495,'1495°C 포정'],[1394,'1394°C δ→γ'],[1147,'1147°C 공정'],[912,'912°C A₃ (순철)'],[770,'770°C A₂ 퀴리점'],[727,'727°C A₁ 공석']];
+const FGUIDE_C={full:[0.76,2.14,4.30],steel:[0.022,0.17,0.53,0.76,2.14],low:[0.022,0.09,0.17]};
+const FINV=[
+  {p:FP.S,t:'공석점',d:'0.76%, 727°C',r:'γ → α + Fe₃C',dy:16},
+  {p:FP.C,t:'공정점',d:'4.30%, 1147°C',r:'L → γ + Fe₃C',dy:18},
+  {p:FP.J,t:'포정점',d:'0.17%, 1495°C',r:'L + δ → γ',dy:16}
+];
+
+const fx=x=>FEC.ML+x/FEC_ZOOMS[fecZoom].xMax*FEC.PW;
+const fy=T=>FEC.MT+(1-T/1600)*FEC.PH;
+const fpts=poly=>poly.map(p=>fx(p[0]).toFixed(1)+','+fy(p[1]).toFixed(1)).join(' ');
+const fmtC=c=>c<0.1?c.toFixed(3):c<1?c.toFixed(2):c.toFixed(2);
+
+function renderFeC(){
+  const svg=document.getElementById('fec-svg');
+  const {ML,MT,PW,PH}=FEC, xMax=FEC_ZOOMS[fecZoom].xMax;
+  let h='<defs>';
+  FREG.filter(r=>r.phases.length===2).forEach(r=>{
+    const [c1,c2]=r.phases.map(p=>FPC[p]);
+    h+=`<pattern id="fpat-${r.id}" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="5" height="10" fill="${c1}"/><rect x="5" width="5" height="10" fill="${c2}"/></pattern>`;
+  });
+  h+=`<clipPath id="fec-clip"><rect x="${ML}" y="${MT}" width="${PW}" height="${PH}"/></clipPath></defs>`;
+  h+=`<rect x="${ML}" y="${MT}" width="${PW}" height="${PH}" class="fec-plotbg"/>`;
+  h+='<g clip-path="url(#fec-clip)">';
+  FREG.forEach(r=>{
+    const fill=r.phases.length===2?`url(#fpat-${r.id})`:FPC[r.phases[0]];
+    h+=`<polygon class="fec-region${r.phases.length===2?' two':''}" data-id="${r.id}" points="${fpts(r.poly)}" fill="${fill}"/>`;
+  });
+  // 점선 가이드
+  const gl=[];
+  FGUIDE_T.forEach(([T,l])=>{
+    h+=`<line class="fec-guide" x1="${ML}" x2="${ML+PW}" y1="${fy(T)}" y2="${fy(T)}"/>`;
+    gl.push([T,l]);
+  });
+  FGUIDE_C[fecZoom].forEach(c=>{
+    h+=`<line class="fec-guide" x1="${fx(c)}" x2="${fx(c)}" y1="${MT}" y2="${MT+PH}"/>`;
+    h+=`<text class="fec-guide-t" transform="translate(${fx(c)+3},${MT+PH-6}) rotate(-90)">${c}%</text>`;
+  });
+  // 상 경계선
+  Object.entries(FCURVE).forEach(([k,pts])=>{
+    h+=`<polyline class="fec-line${k==='liqCD'?' dashed':''}${['peri','eut','eutd'].includes(k)?' inv':''}" points="${fpts(pts)}"/>`;
+  });
+  h+='<g id="fec-sel-g"></g>';
+  // 영역 라벨
+  FLABELS.forEach(L=>{
+    const at=L.at[fecZoom]; if(!at) return;
+    let x=fx(at[0]), y=fy(at[1]);
+    const col=L.c?FPC[L.c]:null;
+    const lead=L.lead&&L.lead[fecZoom];
+    if(lead) h+=`<line class="fec-lead" x1="${x}" y1="${y}" x2="${fx(lead[0])}" y2="${fy(lead[1])}"/><circle cx="${fx(lead[0])}" cy="${fy(lead[1])}" r="2.5" class="fec-lead-dot"/>`;
+    if(L.rot){
+      h+=`<text class="fec-lab big" transform="translate(${x-8},${y}) rotate(-90)" text-anchor="middle" style="fill:${col}">${L.t}<tspan class="fec-lab-s" dx="6">${L.s}</tspan></text>`;
+      return;
+    }
+    const cls=L.dim?'fec-lab dim':L.sm?'fec-lab sm':L.big?'fec-lab big':'fec-lab';
+    if(lead) h+=`<rect class="fec-lab-bg" x="${x-(L.s?30:12)}" y="${y-15}" width="${L.s?60:24}" height="${L.s?34:20}" rx="5"/>`;
+    h+=`<text class="${cls}" x="${x}" y="${y}" text-anchor="middle"${col?` style="fill:${col}"`:''}>${L.t}</text>`;
+    if(L.s) h+=`<text class="fec-lab-s" x="${x}" y="${y+14}" text-anchor="middle">${L.s}</text>`;
+  });
+  // 불변반응 점
+  FINV.forEach(v=>{
+    const x=fx(v.p[0]), y=fy(v.p[1]);
+    if(v.p[0]>xMax) return;
+    h+=`<circle class="fec-inv" cx="${x}" cy="${y}" r="5"/>`;
+    const right=x<ML+PW-150;
+    h+=`<text class="fec-inv-t" x="${right?x+9:x-9}" y="${y+v.dy}" text-anchor="${right?'start':'end'}">${v.t} <tspan class="fec-inv-d">${v.d}</tspan></text>`;
+  });
+  [FP.E,FP.P,FP.H,FP.B].forEach(p=>{if(p[0]<=xMax) h+=`<circle class="fec-pt" cx="${fx(p[0])}" cy="${fy(p[1])}" r="3"/>`});
+  h+='<g id="fec-cross" style="display:none"><line id="fec-cx" class="fec-cross"/><line id="fec-cy" class="fec-cross"/></g>';
+  h+='</g>';
+  // 축
+  h+=`<rect x="${ML}" y="${MT}" width="${PW}" height="${PH}" class="fec-frame"/>`;
+  // 오른쪽 여백 온도 라벨 (가까운 선은 겹치지 않게 위아래로 벌림)
+  let lastY=-99;
+  gl.sort((a,b)=>b[0]-a[0]).forEach(([T,l])=>{
+    const y0=fy(T); let y=Math.max(y0+3.5,lastY+12); lastY=y;
+    const [t1,...rest]=l.split(' ');
+    h+=`<line class="fec-guide" x1="${ML+PW}" x2="${ML+PW+6}" y1="${y0}" y2="${y-3.5}" style="opacity:0.8"/>`;
+    h+=`<text class="fec-guide-r" x="${ML+PW+8}" y="${y}"><tspan class="n">${t1}</tspan> ${rest.join(' ')}</text>`;
+  });
+  const step=FEC_ZOOMS[fecZoom].step;
+  for(let i=0;i*step<=xMax+1e-9;i++){
+    const c=+(i*step).toFixed(2), x=fx(c);
+    h+=`<line class="fec-tick" x1="${x}" x2="${x}" y1="${MT+PH}" y2="${MT+PH+5}"/><text class="fec-tick-t" x="${x}" y="${MT+PH+18}" text-anchor="middle">${c}</text>`;
+  }
+  if(fecZoom==='full') h+=`<text class="fec-tick-t" x="${fx(6.67)}" y="${MT+PH+18}" text-anchor="end" style="fill:${FPC['Fe₃C']}">6.67</text>`;
+  for(let T=0;T<=1600;T+=200){
+    const y=fy(T);
+    h+=`<line class="fec-tick" x1="${ML-5}" x2="${ML}" y1="${y}" y2="${y}"/><text class="fec-tick-t" x="${ML-8}" y="${y+4}" text-anchor="end">${T}</text>`;
+  }
+  h+=`<text class="fec-axis-t" x="${ML+PW/2}" y="${FEC.H-8}" text-anchor="middle">탄소 함량 (wt% C)</text>`;
+  h+=`<text class="fec-axis-t" transform="translate(16,${MT+PH/2}) rotate(-90)" text-anchor="middle">온도 (°C)</text>`;
+  svg.innerHTML=h;
+  drawFecSelection();
+}
+
+function fecPointIn(poly,x,T){
+  let inside=false;
+  for(let i=0,j=poly.length-1;i<poly.length;j=i++){
+    const [xi,yi]=poly[i],[xj,yj]=poly[j];
+    if((yi>T)!==(yj>T)&&x<(xj-xi)*(T-yi)/(yj-yi)+xi) inside=!inside;
+  }
+  return inside;
+}
+// SVG 좌표 기준 다각형까지 거리 (얇은 단상 영역 클릭 보정용)
+function fecPxDist(poly,sx,sy){
+  let best=Infinity;
+  for(let i=0,j=poly.length-1;i<poly.length;j=i++){
+    const ax=fx(poly[j][0]),ay=fy(poly[j][1]),bx=fx(poly[i][0]),by=fy(poly[i][1]);
+    const dx=bx-ax,dy=by-ay,l2=dx*dx+dy*dy||1;
+    const t=Math.max(0,Math.min(1,((sx-ax)*dx+(sy-ay)*dy)/l2));
+    best=Math.min(best,Math.hypot(sx-ax-t*dx,sy-ay-t*dy));
+  }
+  return best;
+}
+function fecRegionAt(x,T,sx,sy){
+  if(T<0||T>1600||x<0||x>FEC_ZOOMS[fecZoom].xMax) return null;
+  if(fecZoom==='full'&&Math.abs(sx-fx(6.67))<6&&T<1227) return 'Fe3C';
+  // α, δ는 전체 보기에서 폭이 수 px라 6px 이내면 해당 상으로 판정
+  for(const id of ['alpha','delta']){
+    const r=FREG_BY[id];
+    if(fecPointIn(r.poly,x,T)||fecPxDist(r.poly,sx,sy)<6) return id;
+  }
+  const r=FREG.find(r=>fecPointIn(r.poly,x,T));
+  return r?r.id:null;
+}
+// 온도 T에서 2상 영역의 공액선(tie line) 양 끝 조성
+function fecTieLine(id,T){
+  const poly=FREG_BY[id].poly, xs=[];
+  for(let i=0,j=poly.length-1;i<poly.length;j=i++){
+    const [xi,yi]=poly[i],[xj,yj]=poly[j];
+    if(yi===yj) continue;
+    if((T>=Math.min(yi,yj))&&(T<=Math.max(yi,yj))) xs.push(xi+(xj-xi)*(T-yi)/(yj-yi));
+  }
+  return xs.length>=2?[Math.min(...xs),Math.max(...xs)]:null;
+}
+function fecRegionName(id){return id==='Fe3C'?'Fe₃C':FREG_BY[id].name}
+
+function fecEventData(e){
+  const svg=document.getElementById('fec-svg');
+  const pt=svg.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;
+  const p=pt.matrixTransform(svg.getScreenCTM().inverse());
+  const x=(p.x-FEC.ML)/FEC.PW*FEC_ZOOMS[fecZoom].xMax, T=(1-(p.y-FEC.MT)/FEC.PH)*1600;
+  return {sx:p.x,sy:p.y,x,T,id:fecRegionAt(x,T,p.x,p.y)};
+}
+function fecSetHover(id){
+  if(fecHoverId===id) return;
+  document.querySelectorAll('#fec-svg .fec-region.hover').forEach(el=>el.classList.remove('hover'));
+  fecHoverId=id;
+  if(id&&id!=='Fe3C'){const el=document.querySelector(`#fec-svg .fec-region[data-id="${id}"]`);if(el)el.classList.add('hover')}
+}
+function initFeC(){
+  const svg=document.getElementById('fec-svg'), tip=document.getElementById('fec-tip'), box=document.getElementById('fec-svg-box');
+  svg.addEventListener('mousemove',e=>{
+    const d=fecEventData(e);
+    const cross=document.getElementById('fec-cross');
+    if(!d.id){tip.style.display='none';cross.style.display='none';fecSetHover(null);svg.style.cursor='default';return}
+    fecSetHover(d.id);
+    cross.style.display='';
+    const cx=document.getElementById('fec-cx'), cy=document.getElementById('fec-cy');
+    cx.setAttribute('x1',d.sx);cx.setAttribute('x2',d.sx);cx.setAttribute('y1',FEC.MT);cx.setAttribute('y2',FEC.MT+FEC.PH);
+    cy.setAttribute('y1',d.sy);cy.setAttribute('y2',d.sy);cy.setAttribute('x1',FEC.ML);cy.setAttribute('x2',FEC.ML+FEC.PW);
+    const name=fecRegionName(d.id), phases=d.id==='Fe3C'?['Fe₃C']:FREG_BY[d.id].phases;
+    tip.innerHTML=`<b>${phases.map(p=>`<span style="color:${FPC[p]}">${p}</span>`).join(' + ')}</b><br>T = ${Math.round(d.T)}°C · C = ${fmtC(Math.max(0,d.x))} wt%`;
+    const r=box.getBoundingClientRect();
+    let left=e.clientX-r.left+14, top=e.clientY-r.top+14;
+    if(left>r.width-170) left=e.clientX-r.left-170;
+    tip.style.left=left+'px';tip.style.top=top+'px';tip.style.display='block';
+    svg.style.cursor='pointer';
+  });
+  svg.addEventListener('mouseleave',()=>{tip.style.display='none';document.getElementById('fec-cross').style.display='none';fecSetHover(null)});
+  svg.addEventListener('click',e=>{
+    const d=fecEventData(e);
+    if(d.id) selectFec(d.id,Math.max(0,d.x),d.T);
+  });
+  renderFeC();
+}
+function setFecZoom(z,btn){
+  fecZoom=z;
+  document.querySelectorAll('#fec-zoom .view-btn').forEach(b=>b.classList.remove('active-view'));
+  if(btn) btn.classList.add('active-view');
+  renderFeC();
+}
+function drawFecSelection(){
+  const g=document.getElementById('fec-sel-g'); if(!g||!fecSel) return;
+  const {id,x,T}=fecSel;
+  let h='';
+  if(id!=='Fe3C'&&id!=='L'&&FREG_BY[id].phases.length===2){
+    const tl=fecTieLine(id,T);
+    if(tl){
+      const [cl,cr]=tl, ph=FREG_BY[id].phases;
+      h+=`<line class="fec-tie" x1="${fx(cl)}" x2="${fx(cr)}" y1="${fy(T)}" y2="${fy(T)}"/>`;
+      h+=`<circle cx="${fx(cl)}" cy="${fy(T)}" r="5" fill="${FPC[ph[0]]}" class="fec-tie-end"/><circle cx="${fx(cr)}" cy="${fy(T)}" r="5" fill="${FPC[ph[1]]}" class="fec-tie-end"/>`;
+    }
+  }
+  h+=`<circle class="fec-sel" cx="${fx(x)}" cy="${fy(T)}" r="6"/>`;
+  g.innerHTML=h;
+  document.querySelectorAll('#fec-svg .fec-region.selected').forEach(el=>el.classList.remove('selected'));
+  const el=document.querySelector(`#fec-svg .fec-region[data-id="${id}"]`); if(el) el.classList.add('selected');
+}
+
+// ----- 정보 패널 데이터 -----
+const FEC_PHASE={
+  'α':{name:'α-페라이트 (Ferrite)',struct:'BCC 체심입방 · a = 0.2866 nm',mag:'강자성 (770°C A₂ 이하) · 770–912°C 상자성',hard:'낮음 · 약 80–90 HB',duct:'매우 높음 (연신율 약 40%)',maxC:'0.022 wt% (727°C) · 상온 약 0.005 wt% 이하',range:'912°C 이하'},
+  'γ':{name:'γ-오스테나이트 (Austenite)',struct:'FCC 면심입방 · a ≈ 0.359 nm (912°C 부근)',mag:'상자성 (비자성)',hard:'중간 · 상온 안정화 시 약 150–200 HB',duct:'매우 높음 — 열간 압연·단조 온도역',maxC:'2.14 wt% (1147°C)',range:'727–1495°C (탄소량에 따라)'},
+  'δ':{name:'δ-페라이트 (Delta ferrite)',struct:'BCC 체심입방 · a ≈ 0.293 nm',mag:'상자성 (퀴리점보다 고온)',hard:'— (고온에서만 안정)',duct:'높음 (고온)',maxC:'0.09 wt% (1495°C)',range:'1394–1538°C'},
+  'L':{name:'L — 액상 (Liquid)',struct:'액체 (장거리 규칙성 없음)',mag:'—',hard:'—',duct:'—',maxC:'제한 없음 (Fe–C 융체)',range:'액상선 위 · 순철 융점 1538°C'},
+  'Fe₃C':{name:'Fe₃C — 시멘타이트 (Cementite)',struct:'사방정 (orthorhombic) · 단위셀 Fe₁₂C₄',mag:'강자성 (210°C A₀ 이하)',hard:'매우 높음 · 약 800 HV',duct:'거의 없음 — 취성',maxC:'6.67 wt% 고정 (금속간 화합물)',range:'준안정 — 장시간 고온 유지 시 Fe + 흑연으로 분해'}
+};
+const FEC_STRUCT={'α':'bcc','δ':'bcc','γ':'fcc'};
+const FEC_MAXC={'α':0.022,'δ':0.09,'γ':2.14};
+// wt% C → C 원자 1개당 Fe 원자 수
+function fecFePerC(wt){const c=wt/12.011, fe=(100-wt)/55.845;return fe/c}
+
+function fecMicro(id,C,T){
+  const P=(a,b)=>`<strong>${(a*100).toFixed(1)}%</strong>`+(b?` ${b}`:'');
+  const pear=()=>{
+    if(C<0.022) return `탄소가 α 고용한도를 살짝 넘는 정도라 <strong>α 결정립 + 입계의 3차 시멘타이트</strong>로 구성됩니다 (거의 순철).`;
+    if(Math.abs(C-0.76)<0.03) return `<strong>공석강</strong>: 100% <strong>펄라이트</strong> (α와 Fe₃C의 층상 조직). 펄라이트 내 Fe₃C 분율 = (0.76−0.022)/(6.67−0.022) ≈ 11%.`;
+    if(C<0.76){const wp=(C-0.022)/(0.76-0.022);return `<strong>아공석강</strong>: 초석 α + 펄라이트. 727°C 바로 아래에서 펄라이트 분율 W<sub>P</sub> = (C₀−0.022)/(0.76−0.022) = ${P(wp)}, 초석 α ${P(1-wp)}.`}
+    if(C<=2.14){const wp=(6.67-C)/(6.67-0.76);return `<strong>과공석강</strong>: 구 오스테나이트 입계를 따라 망상의 초석 Fe₃C + 펄라이트. W<sub>P</sub> = (6.67−C₀)/(6.67−0.76) = ${P(wp)}, 초석 Fe₃C ${P(1-wp)}.`}
+    return `<strong>백주철</strong> 조성: 변태 레데뷰라이트(펄라이트 + Fe₃C) ${C<4.3?'+ 초정 γ에서 생긴 펄라이트':C>4.3?'+ 초정 Fe₃C':''}. 매우 단단하고 취약합니다.`;
+  };
+  switch(id){
+    case 'alpha': return `다각형(등축) 페라이트 결정립. 탄소는 ${T<727?'솔버스선 아래 극소량만':'최대 0.022 wt%까지'} 팔면체 간극에 고용됩니다. 연하고 자성이 있어${T<770?' (현재 온도는 퀴리점 770°C 아래 → 강자성)':' (현재 온도는 770°C 위 → 상자성)'}, 저탄소 강판의 기본 조직입니다.`;
+    case 'gamma': {
+      let s='등축 오스테나이트 결정립 (어닐링 쌍정 흔함). 열간가공·담금질 전 가열(오스테나이트화) 온도역입니다.<br><br><strong>냉각 경로</strong>: ';
+      if(C<0.76) s+='서냉 시 A₃선에서 초석 α가 입계에 생기고, 727°C에서 남은 γ(0.76%C)가 펄라이트로 변태 → <strong>초석 α + 펄라이트</strong>.';
+      else if(Math.abs(C-0.76)<0.03) s+='서냉 시 727°C에서 한꺼번에 <strong>펄라이트</strong>로 변태.';
+      else s+='서냉 시 Acm선에서 초석 Fe₃C가 입계에 석출하고, 727°C에서 남은 γ가 펄라이트로 → <strong>초석 Fe₃C + 펄라이트</strong>.';
+      return s+' 급랭하면 확산 없이 <strong>마르텐사이트(BCT)</strong>가 됩니다.';
+    }
+    case 'delta': return '응고 직후의 고온 BCC 상. 냉각하면 1394°C(순철) 또는 포정반응(1495°C, L + δ → γ)을 거쳐 γ로 변태합니다. 스테인리스 용접부에는 일부 잔류하기도 합니다.';
+    case 'L': return '완전 액상. 냉각하면 액상선에서 초정(δ, γ 또는 Fe₃C)이 정출하기 시작합니다.';
+    case 'Fe3C': return '경질의 금속간 화합물. 강에서는 펄라이트의 층상 조직이나 입계 망상 조직으로, 백주철에서는 레데뷰라이트로 나타납니다.';
+    case 'Ld': return '초정 δ 수지상정이 액상 속에서 정출 중입니다. 1495°C에서 포정반응 L + δ → γ가 일어납니다.';
+    case 'dg': return '포정반응 직후 영역. 남아 있는 δ가 γ로 변태하는 중입니다.';
+    case 'Lg': return C<2.14?'초정 γ 수지상정이 정출 중. 고상선 아래에서 완전히 γ가 됩니다 (강).':'초정 γ 수지상정 + 잔류 액상 (아공정 주철). 1147°C에서 남은 액상(4.30%C)이 레데뷰라이트(γ + Fe₃C 공정조직)가 됩니다.';
+    case 'LC': return '초정 Fe₃C가 판상으로 정출 중 (과공정 주철). 1147°C에서 남은 액상이 레데뷰라이트가 됩니다.';
+    case 'gC': return C<=2.14?'<strong>과공석강</strong>: 오스테나이트 입계에 초석 Fe₃C가 석출하는 중. 727°C 아래에서 남은 γ는 펄라이트가 됩니다.':`<strong>주철</strong>: 레데뷰라이트 (γ + Fe₃C 공정조직)${C<4.3?' + 초정 γ':C>4.3?' + 초정 Fe₃C':''}. 727°C에서 γ는 펄라이트로 변태합니다.`;
+    case 'ag': return '아공석강의 A₃–A₁ 구간. 오스테나이트 입계에서 <strong>초석 α</strong>가 핵생성·성장하고, 남은 γ의 탄소 농도는 A₃선을 따라 0.76%로 올라갑니다.';
+    case 'aC': return pear();
+  }
+  return '';
+}
+
+// ----- 3D 단위격자 뷰 -----
+const fec3d={scene:null,camera:null,renderer:null,group:null,cam:{theta:1.1,phi:0.4,radius:5.6},down:false,last:{x:0,y:0},phase:null};
+let fecHard=false, fecTetra=false, fecBct=false;
+function initFec3D(){
+  const container=document.getElementById('fec-3d'), V=fec3d;
+  V.scene=new THREE.Scene();
+  V.camera=new THREE.PerspectiveCamera(40,1.3,0.1,50);
+  V.renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+  V.renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  V.renderer.setSize(320,250);
+  container.insertBefore(V.renderer.domElement,container.firstChild);
+  V.scene.add(new THREE.AmbientLight(0xffffff,0.5));
+  const d1=new THREE.DirectionalLight(0xffffff,0.8);d1.position.set(5,5,5);V.scene.add(d1);
+  const d2=new THREE.DirectionalLight(0xffffff,0.3);d2.position.set(-3,-2,-3);V.scene.add(d2);
+  V.group=new THREE.Group();V.scene.add(V.group);
+  const cvs=V.renderer.domElement;
+  cvs.addEventListener('pointerdown',e=>{V.down=true;V.last={x:e.clientX,y:e.clientY};cvs.setPointerCapture(e.pointerId)});
+  cvs.addEventListener('pointerup',e=>{V.down=false;cvs.releasePointerCapture(e.pointerId)});
+  cvs.addEventListener('pointermove',e=>{
+    if(!V.down)return;
+    V.cam.phi-=(e.clientX-V.last.x)*0.008;
+    V.cam.theta=Math.max(0.05,Math.min(Math.PI-0.05,V.cam.theta-(e.clientY-V.last.y)*0.008));
+    V.last={x:e.clientX,y:e.clientY};
+  });
+  cvs.addEventListener('wheel',e=>{e.preventDefault();V.cam.radius=Math.max(3,Math.min(12,V.cam.radius+e.deltaY*0.005))},{passive:false});
+}
+function resizeFec3D(){
+  const c=document.getElementById('fec-3d'), V=fec3d;
+  if(!V.renderer||!c.clientWidth)return;
+  V.camera.aspect=c.clientWidth/c.clientHeight;V.camera.updateProjectionMatrix();
+  V.renderer.setSize(c.clientWidth,c.clientHeight);
+}
+function buildFecCell(phase){
+  const V=fec3d; if(!V.group) return;
+  clearGroup(V.group);V.phase=phase;
+  const struct=FEC_STRUCT[phase], S=1.6, half=S/2;
+  const cz=struct==='bcc'&&fecBct?1.12:1;
+  // Fe r = 0.124 nm, C r = 0.077 nm 기준. BCC a = 4r/√3, FCC a = 2√2·r
+  const aNm=struct==='bcc'?4*0.124/Math.sqrt(3):2*Math.SQRT2*0.124, k=S/aNm;
+  const shrink=fecHard?1:0.38, Rfe=0.124*k*shrink, Rc=0.077*k*shrink;
+  const pos=f=>new THREE.Vector3(f[0]*S-half,f[1]*S-half,(f[2]*S-half)*cz);
+  const feCol=phase==='γ'?0x5ba4f5:phase==='δ'?0xf5d042:0xf59e42;
+  crystalData[struct].atoms.forEach(f=>{
+    const m=makeSphere(Rfe,feCol);m.position.copy(pos(f));
+    if(fecHard){m.material.opacity=0.2;m.material.depthWrite=false}
+    V.group.add(m);
+  });
+  const box=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(S,S,S*cz)),new THREE.LineBasicMaterial({color:feCol,transparent:true,opacity:0.4}));
+  V.group.add(box);
+  // 팔면체 간극: 점유(탄소) / 빈 자리(반투명)
+  const occ=struct==='bcc'?'1,0,0.5':'0.5,0.5,0.5';
+  const octR=OCT_SITES[struct].ratio*0.124*k*shrink;
+  OCT_SITES[struct].sites.forEach(f=>{
+    if(f.join(',')===occ){
+      const c=makeSphere(Rc,0x262626);c.material.opacity=1;c.material.shininess=120;c.position.copy(pos(f));V.group.add(c);
+      const halo=new THREE.Mesh(new THREE.SphereGeometry(Rc*1.14,24,24),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.55,side:THREE.BackSide}));
+      halo.position.copy(pos(f));V.group.add(halo);
+    } else {
+      const m=new THREE.Mesh(new THREE.SphereGeometry(octR,20,20),new THREE.MeshPhongMaterial({color:0xff5577,emissive:0xff5577,emissiveIntensity:0.3,transparent:true,opacity:0.5}));
+      m.position.copy(pos(f));V.group.add(m);
+    }
+  });
+  if(fecTetra){
+    const tet=[];
+    if(struct==='bcc'){
+      for(let ax=0;ax<3;ax++)for(const v of [0,1])for(const uv of [[.5,.25],[.5,.75],[.25,.5],[.75,.5]]){const p=uv.slice();p.splice(ax,0,v);tet.push(p)}
+    } else {
+      for(const a of [.25,.75])for(const b of [.25,.75])for(const c of [.25,.75])tet.push([a,b,c]);
+    }
+    const tR=(struct==='bcc'?0.291:0.225)*0.124*k*shrink;
+    const tg=new THREE.SphereGeometry(tR,16,16);
+    tet.forEach(f=>{
+      const m=new THREE.Mesh(tg,new THREE.MeshPhongMaterial({color:0x44ddff,emissive:0x44ddff,emissiveIntensity:0.3,transparent:true,opacity:0.5}));
+      m.position.copy(pos(f));V.group.add(m);
+    });
+  }
+  buildAxes(V.group,1.1);
+}
+function setFecToggle(which){
+  if(which==='hard') fecHard=!fecHard;
+  if(which==='tetra') fecTetra=!fecTetra;
+  if(which==='bct') fecBct=!fecBct;
+  document.getElementById('fec-t-hard').classList.toggle('on',fecHard);
+  document.getElementById('fec-t-tetra').classList.toggle('on',fecTetra);
+  document.getElementById('fec-t-bct').classList.toggle('on',fecBct);
+  if(fec3d.phase) buildFecCell(fec3d.phase);
+}
+
+function fecPhaseCard(ph,extra){
+  const d=FEC_PHASE[ph];
+  return `<div class="fec-card" style="border-left-color:${FPC[ph]}">
+    <div class="fec-card-h" style="color:${FPC[ph]}">${d.name}</div>
+    ${[['결정구조',d.struct],['자성',d.mag],['경도',d.hard],['연성',d.duct],['최대 C 고용도',d.maxC],['안정 온도',d.range]].map(([l,v])=>`<div class="prop-row"><span class="prop-label">${l}</span><span class="prop-value fec-pv">${v}</span></div>`).join('')}
+    ${extra||''}
+  </div>`;
+}
+function selectFec(id,x,T){
+  fecSel={id,x,T};
+  drawFecSelection();
+  const reg=id==='Fe3C'?{name:'Fe₃C',phases:['Fe₃C']}:FREG_BY[id];
+  const ph=reg.phases, single=ph.length===1;
+  const head=document.getElementById('fec-head');
+  head.innerHTML=`<div class="fec-head-row">${ph.map(p=>`<span class="fec-chip" style="background:${FPC[p]}">${p}</span>`).join('<span class="fec-plus">+</span>')}
+    <span class="fec-coord">${Math.round(T)}°C · ${fmtC(x)} wt% C</span></div>
+    <h3>${single?FEC_PHASE[ph[0]].name:reg.name+' — 2상 영역'}</h3>`;
+  const interstitial=single&&FEC_STRUCT[ph[0]];
+  document.getElementById('fec-3d-section').style.display=interstitial?'':'none';
+  document.getElementById('fec-inter').style.display=interstitial?'':'none';
+  document.getElementById('fec-ss').style.display=interstitial?'':'none';
+  if(interstitial){
+    const p=ph[0], struct=FEC_STRUCT[p];
+    document.getElementById('fec-t-bct-row').style.display=struct==='bcc'?'':'none';
+    const fePerC=fecFePerC(FEC_MAXC[p]), cells=fePerC/(struct==='bcc'?2:4);
+    document.getElementById('fec-3d-note').innerHTML=`${struct.toUpperCase()} 단위셀에 탄소 1개를 팔면체 간극에 넣어 표시했습니다. 실제 최대 고용(${FEC_MAXC[p]} wt%)에서도 C 1개당 Fe 약 <strong>${Math.round(fePerC)}개</strong> (단위셀 약 ${cells<10?cells.toFixed(1):Math.round(cells)}개)입니다.`;
+    document.querySelectorAll('#fec-inter-table .hl').forEach(el=>el.classList.remove('hl'));
+    document.querySelectorAll(`#fec-inter-table .c-${struct}`).forEach(el=>el.classList.add('hl'));
+    resizeFec3D();buildFecCell(p);
+  }
+  // 상 카드 + 미세조직
+  const micro=`<div class="desc-block"><strong>미세조직</strong> (${Math.round(T)}°C, ${fmtC(x)}% C)<br>${fecMicro(id,x,T)}</div>`;
+  let lever='';
+  if(!single){
+    const tl=fecTieLine(id,T);
+    if(tl){
+      const [cl,cr]=tl, [pl,pr]=ph, C0=Math.min(Math.max(x,cl),cr);
+      const wl=(cr-C0)/(cr-cl), wr=1-wl;
+      const sub=p=>p==='Fe₃C'?'Fe₃C':p;
+      lever=`<div class="fec-lever">
+        <h4>지렛대 규칙 (Lever rule)</h4>
+        <div class="lever-viz">
+          <div class="lever-line"><span class="lever-l" style="width:${wr*100}%;background:${FPC[pr]}" title="이 팔 길이 ∝ W_${sub(pr)}"></span><span class="lever-r" style="width:${wl*100}%;background:${FPC[pl]}" title="이 팔 길이 ∝ W_${sub(pl)}"></span>
+            <i class="lever-c0" style="left:${wr*100}%"></i></div>
+          <div class="lever-ends"><span style="color:${FPC[pl]}">C<sub>${sub(pl)}</sub> = ${fmtC(cl)}</span><span>C₀ = ${fmtC(C0)}</span><span style="color:${FPC[pr]}">C<sub>${sub(pr)}</sub> = ${fmtC(cr)}</span></div>
+        </div>
+        <div class="lever-eq">W<sub>${sub(pl)}</sub> = (C<sub>${sub(pr)}</sub> − C₀) / (C<sub>${sub(pr)}</sub> − C<sub>${sub(pl)}</sub>)<br>= (${fmtC(cr)} − ${fmtC(C0)}) / (${fmtC(cr)} − ${fmtC(cl)}) = <b style="color:${FPC[pl]}">${(wl*100).toFixed(1)}%</b></div>
+        <div class="lever-eq">W<sub>${sub(pr)}</sub> = (C₀ − C<sub>${sub(pl)}</sub>) / (C<sub>${sub(pr)}</sub> − C<sub>${sub(pl)}</sub>)<br>= (${fmtC(C0)} − ${fmtC(cl)}) / (${fmtC(cr)} − ${fmtC(cl)}) = <b style="color:${FPC[pr]}">${(wr*100).toFixed(1)}%</b></div>
+        <div class="lever-note">${Math.round(T)}°C에서 수평 공액선(tie line)을 그어 양쪽 상 경계와 만나는 조성이 각 상의 조성입니다. 각 상의 분율은 <strong>반대쪽</strong> 팔의 길이에 비례합니다 (막대 색 = 그 팔이 나타내는 상) — C₀가 ${sub(pl)} 쪽에 가까울수록 ${sub(pl)}가 많습니다.</div>
+      </div>`;
+    }
+  }
+  document.getElementById('fec-lever').innerHTML=lever;
+  document.getElementById('fec-card').innerHTML=(single?fecPhaseCard(ph[0]):ph.map(p=>fecPhaseCard(p)).join(''))+micro;
+}
+
+// ===== INIT & ANIMATE =====
+function init(){
+  initScene('crystal','crystal-canvas');
+  crystalGroup=new THREE.Group();scenes.crystal.add(crystalGroup);
+  initOctPip();
+  initFeC();initFec3D();selectFec('gamma',0.4,1100);
+  initScene('disloc','disloc-canvas');
+  dislocGroup=new THREE.Group();scenes.disloc.add(dislocGroup);
+  initScene('slip','slip-canvas');
+  slipGroup=new THREE.Group();scenes.slip.add(slipGroup);
+  initScene('stack','stack-canvas');
+  stackGroup=new THREE.Group();scenes.stack.add(stackGroup);
+  switchCrystal('bcc',document.querySelector('#crystal-sub-tabs .sub-tab'));
+  switchDisloc('edge',document.querySelector('#disloc-info .sub-tab'));
+  switchSlip('bcc',document.querySelector('#slip-info .sub-tab'));
+  initPip();
+  switchStacking('fcc',document.querySelector('#stack-sub-tabs .sub-tab'));
+  animate();
+}
+let lastDT=0;
+function animate(t){
+  requestAnimationFrame(animate);
+  if(dislocAnimating&&t){const spd=parseInt(document.getElementById('animSpeed').value)||5;if(t-lastDT>(220-spd*20)){dislocPhase+=0.4;if(dislocPhase>8)dislocPhase=0;rebuildDisloc();lastDT=t}}
+
+  // Smooth camera transitions
+  for(const id of ['crystal','disloc','slip','stack']){
+    const tgt=camTarget[id];
+    if(tgt){
+      const s=camState[id];
+      const ease=0.08;
+      s.theta+=(tgt.theta-s.theta)*ease;
+      s.phi+=(tgt.phi-s.phi)*ease;
+      s.radius+=(tgt.radius-s.radius)*ease;
+      if(Math.abs(s.theta-tgt.theta)<0.002&&Math.abs(s.phi-tgt.phi)<0.002&&Math.abs(s.radius-tgt.radius)<0.01) camTarget[id]=null;
+    }
+  }
+
+  if(fec3d.renderer&&document.getElementById('panel-fec').classList.contains('active')&&fec3d.phase){
+    updateCameraFromSpherical(fec3d.camera,fec3d.cam);
+    fec3d.renderer.render(fec3d.scene,fec3d.camera);
+  }
+  for(const id of ['crystal','disloc','slip','stack']){
+    const panelId=id==='disloc'?'dislocation':id==='stack'?'stacking':id;
+    const panel=document.getElementById('panel-'+panelId);
+    if(!panel||!panel.classList.contains('active')) continue;
+    updateCameraFromSpherical(cameras[id],camState[id]);
+    renderers[id].render(scenes[id],cameras[id]);
+    if(id==='crystal'&&showOctSites&&OCT_SITES[currentCrystal]&&octPip.renderer){
+      updateCameraFromSpherical(octPip.camera,octPip.cam);
+      octPip.renderer.render(octPip.scene,octPip.camera);
+    }
+    // Render PIP when stacking tab is active
+    if(id==='stack'&&pipRenderer&&pipCamera){
+      updateCameraFromSpherical(pipCamera,pipCamState);
+      pipRenderer.render(pipScene,pipCamera);
+    }
+  }
+}
+function handleResize(){
+  resizeFec3D();
+  for(const id of ['crystal','disloc','slip','stack']){
+    const container=document.getElementById(id+'-canvas');
+    if(!container||!renderers[id])continue;
+    const w=container.clientWidth,h=container.clientHeight;
+    if(w>0&&h>0){cameras[id].aspect=w/h;cameras[id].updateProjectionMatrix();renderers[id].setSize(w,h)}
+  }
+}
+window.addEventListener('resize',()=>{
+  handleResize();resizeOctPip();
+  if(pipRenderer){
+    const c=document.getElementById('pip-canvas');
+    if(c){const w=c.clientWidth,h=c.clientHeight;if(w>0&&h>0){pipCamera.aspect=w/h;pipCamera.updateProjectionMatrix();pipRenderer.setSize(w,h)}}
+  }
+});
+document.addEventListener('DOMContentLoaded',init);
+</script>
+</body>
+</html>
